@@ -23,7 +23,7 @@ args = parser.parse_args()
 
 def train(trainX_loader, trainY_loader, encoder, decoder, enc_optimizer, dec_optimizer, epochs=10):
     for epoch in range(epochs):
-        for batchX, batchY in enumerate(zip(trainX_loader, trainY_loader)):
+        for _, (batchX, batchY) in enumerate(zip(trainX_loader, trainY_loader)):
             enc_optimizer.zero_grad()
             dec_optimizer.zero_grad()
 
@@ -55,14 +55,16 @@ def main():
     trainX = utils.MyDatasets('PART_III.article', max_len=100, n_data=N_TRAIN)
     trainY = utils.MyDatasets('PART_III.summary', max_len=25, n_data=N_TRAIN)
 
-    trainX_loader = DataLoader(trainX, batch_size=BATCH_SIZE, num_workers=4)
-    trainY_loader = DataLoader(trainY, batch_size=BATCH_SIZE, num_workers=4)
+    print(trainX.datas.shape, trainY.datas.shape)
 
-    encoder = SelectiveBiGRU(trainX.vocab_size, EMB_DIM, HID_DIM//2)
-    decoder = AttentionDecoder(trainX.vocab_size, EMB_DIM, HID_DIM)
+    trainX_loader = DataLoader(trainX, batch_size=BATCH_SIZE, num_workers=2)
+    trainY_loader = DataLoader(trainY, batch_size=BATCH_SIZE, num_workers=2)
+
+    encoder = SelectiveBiGRU(trainX.vocab_size, EMB_DIM, HID_DIM//2, batch_size=BATCH_SIZE)
+    decoder = AttentionDecoder(trainX.vocab_size, EMB_DIM, HID_DIM, batch_size=BATCH_SIZE)
     
-    enc_optimizer = torch.optim.SGD(encoder.parameters(), lr=0.01, weight_decay=0.9)
-    dec_optimizer = torch.optim.SGD(decoder.parameters(), lr=0.01, weight_decay=0.9)
+    enc_optimizer = torch.optim.SGD(encoder.parameters(), lr=0.001)
+    dec_optimizer = torch.optim.SGD(decoder.parameters(), lr=0.001)
 
     train(trainX_loader, trainY_loader, encoder, decoder, enc_optimizer, dec_optimizer)
 

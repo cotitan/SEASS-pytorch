@@ -40,14 +40,15 @@ def load_data(filename, max_len=100, n_data=None, data_dir='./data/',
         if idx == n_data or line == '':
             break
 
-        sample = [vocab[st]] + [vocab[ed]]*(max_len-1)
+        sample = np.ones(max_len, dtype=np.int32) * vocab[ed]
+        sample[0] = vocab[st]
         words = line.strip().split()
         for i in range(min(len(words), max_len-2)):
             sample[i+1] = vocab[words[i]] if words[i] in vocab else vocab[unk]
         
         datas.append(sample)
 
-    return torch.tensor(datas), vocab
+    return np.array(datas, np.long), vocab
 
 
 class MyDatasets(Dataset):
