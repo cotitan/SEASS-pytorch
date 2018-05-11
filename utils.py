@@ -2,7 +2,7 @@ import os
 from collections import defaultdict
 import json
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import torch
 
 def build_vocab(filelist=['data/PART_I.article', 'data/PART_I.summary'],
@@ -26,54 +26,40 @@ def build_vocab(filelist=['data/PART_I.article', 'data/PART_I.summary'],
     json.dump(vocab, open(vocab_file,'w'))
 
 
-def load_data(fileX='PART_III.article', fileY='PART_III.summary', n_data=None, data_dir='./data/',
-            vocab_file='vocab.json', xlen=100, ylen=25, st='<s>', ed = '</s>', unk='<unk>'):
+def load_data(filename, max_len=100, n_data=None, data_dir='./data/',
+            vocab_file='vocab.json', st='<s>', ed = '</s>', unk='<unk>'):
     
     if not os.path.exists(data_dir + vocab_file):
         build_vocab()
     vocab = json.load(open(data_dir + vocab_file))
-    f1 = open(data_dir + fileX)
-    f2 = open(data_dir + fileY)
-    X = []
-    Y = []
 
-    print('Max length for summary/ariticle: %d/%d' % (xlen, ylen))
+    fin = open(data_dir + filename)
 
-    for idx, article in enumerate(f1):
-        if idx == n_data:
+    datas = []
+    for idx, line in enumerate(fin):
+        if idx == n_data or line == '':
             break
-        summary = f2.readline()
 
-        if article=='' or summary=='':
-            break
+        sample = [vocab[st]] + [vocab[ed]]*(max_len-1)
+        words = line.strip().split()
+        for i in range(min(len(words), max_len-2)):
+            sample[i+1] = vocab[words[i]] if words[i] in vocab else vocab[unk]
         
-        x = [vocab[st]] + [vocab[ed]]*(xlen-1)
-        words = article.strip().split()
-        for i in range(min(len(words), xlen-2)):
-            x[i+1] = vocab[words[i]] if words[i] in vocab else vocab[unk]
-        
-        y = [vocab[st]] + [vocab[ed]]*(ylen-1)
-        words = summary.strip().split()
-        for i in range(min(len(words), ylen-2)):
-            y[i+1] = vocab[words[i]] if words[i] in vocab else vocab[unk]
-        
-        X.append(x)
-        Y.append(y)
+        datas.append(sample)
 
-    return torch.tensor(X), torch.tensor(Y), vocab
+    return torch.tensor(datas), vocab
 
 
 class MyDatasets(Dataset):
-    def __init__(self, fileX, fileY, n_data=None, data_dir='data/',
-                vocab_file='vocab.json', xlen=100, ylen=25, st='<s>', ed = '</s>', unk='<unk>'):
+    def __init__(self, filename, max_len=100, n_data=None, data_dir='data/',
+                vocab_file='vocab.json', st='<s>', ed = '</s>', unk='<unk>'):
         self._size = n_data
-        self._xlen = xlen
-        self._ylen = ylen
-        self.X, self.Y, self.vocab = load_data(fileX, fileY, n_data, data_dir, vocab_file, xlen, ylen, st, ed, unk)
+        self._max_len = max_len
+        self.datas, self.vocab = load_data(filename, max_len, n_data, data_dir, vocab_file, st, ed, unk)
         self.vocab_size = len(self.vocab)
     
     def __getitem__(self, idx):
-        return self.X[idx], self.Y[idx]
+        return self.datas[idx]
     
     def __len__(self):
         return self._size
