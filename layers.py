@@ -71,36 +71,3 @@ class AttentionDecoder(nn.Module):
                 self.loss += -torch.log(probs[:,:,sentence[i+1]])
             return torch.sum(self.loss)
 
-def train(articles, summaries, encoder, decoder, enc_optimizer, dec_optimizer, epochs=50):
-    for epoch in range(epochs):
-        for i in range(articles.shape[0]):
-            enc_optimizer.zero_grad()
-            dec_optimizer.zero_grad()
-
-            states, hidden = encoder(articles[i])
-            loss = decoder(summaries[i], hidden, states)
-            print(loss)
-
-            loss.backward(retain_graph=True)
-            enc_optimizer.step()
-            dec_optimizer.step()
-
-        
-def main():
-    encoder = SelectiveBiGRU(10, 20, 30)
-    decoder = AttentionDecoder(10, 20, 60)
-    x = torch.tensor([[0,1,2,3,4,5,6],[1,2,5,7]], dtype=torch.long)
-    y = torch.tensor([[0,1,2,3,4,5,6],[1,2,5,7]], dtype=torch.long)
-    # states.size()=(len(x), batch_size, hid_dim*2)
-    # hidden.size() = [2, batch_size, hid_dim*2]; here 2 means 2 layers
-    enc_optimizer = torch.optim.SGD(encoder.parameters(), lr=0.03,weight_decay=0.9)
-    dec_optimizer = torch.optim.SGD(decoder.parameters(), lr=0.03)
-
-    train(x.view(1,-1), y.view(1,-1), encoder, decoder, enc_optimizer, dec_optimizer)
-    
-
-def test():
-    pass
-
-if __name__ == '__main__':
-    main()

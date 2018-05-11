@@ -1,8 +1,9 @@
 import os
-import sys
 from collections import defaultdict
 import json
 import numpy as np
+from torch.utils.data import Dataset, DataLoader
+import torch
 
 def build_vocab(filelist=['data/PART_I.article', 'data/PART_I.summary'],
                 vocab_file='data/vocab.json', low_freq_bound=5):
@@ -25,15 +26,14 @@ def build_vocab(filelist=['data/PART_I.article', 'data/PART_I.summary'],
     json.dump(vocab, open(vocab_file,'w'))
 
 
-def load_data(f_article='data/PART_III.article', f_summary='data/PART_III.summary', n_data=None,
-            vocab_file='data/vocab.json', xlen=100, ylen=25, st='<s>', ed = '</s>', unk='<unk>'):
+def load_data(fileX='PART_III.article', fileY='PART_III.summary', n_data=None, data_dir='./data/',
+            vocab_file='vocab.json', xlen=100, ylen=25, st='<s>', ed = '</s>', unk='<unk>'):
     
-    if not os.path.exists(vocab_file):
+    if not os.path.exists(data_dir + vocab_file):
         build_vocab()
-    vocab = json.load(open(vocab_file))
-
-    f1 = open(f_article)
-    f2 = open(f_summary)
+    vocab = json.load(open(data_dir + vocab_file))
+    f1 = open(data_dir + fileX)
+    f2 = open(data_dir + fileY)
     X = []
     Y = []
 
@@ -60,8 +60,22 @@ def load_data(f_article='data/PART_III.article', f_summary='data/PART_III.summar
         X.append(x)
         Y.append(y)
 
-    return X, Y
-        
+    return torch.tensor(X), torch.tensor(Y), vocab
 
+
+class MyDatasets(Dataset):
+    def __init__(self, fileX, fileY, n_data=None, data_dir='data/',
+                vocab_file='vocab.json', xlen=100, ylen=25, st='<s>', ed = '</s>', unk='<unk>'):
+        self._size = n_data
+        self._xlen = xlen
+        self._ylen = ylen
+        self.X, self.Y, self.vocab = load_data(fileX, fileY, n_data, data_dir, vocab_file, xlen, ylen, st, ed, unk)
+        self.vocab_size = len(self.vocab)
+    
+    def __getitem__(self, idx):
+        return self.X[idx], self.Y[idx]
+    
+    def __len__(self):
+        return self._size
 
 
