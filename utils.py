@@ -53,11 +53,11 @@ def load_data(filename, max_len=100, n_data=None, data_dir='./data/',
 
 class MyDatasets(Dataset):
     def __init__(self, filename, max_len=100, n_data=None, data_dir='data/',
-                vocab_file='vocab.json', st='<s>', ed = '</s>', unk='<unk>'):
-        self._size = n_data
+                vocab_file='vocab.json', st='<s>', ed='</s>', unk='<unk>'):
         self._max_len = max_len
         self.datas, self.vocab = load_data(filename, max_len, n_data, data_dir, vocab_file, st, ed, unk)
         self.vocab_size = len(self.vocab)
+        self._size = len(self.datas)
     
     def __getitem__(self, idx):
         return self.datas[idx]

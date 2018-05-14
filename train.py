@@ -63,10 +63,11 @@ def main():
     encoder = SelectiveBiGRU(trainX.vocab_size, EMB_DIM, HID_DIM//2, batch_size=BATCH_SIZE)
     decoder = AttentionDecoder(trainX.vocab_size, EMB_DIM, HID_DIM, batch_size=BATCH_SIZE)
     
-    enc_optimizer = torch.optim.SGD(encoder.parameters(), lr=0.001)
-    dec_optimizer = torch.optim.SGD(decoder.parameters(), lr=0.001)
+    enc_optimizer = torch.optim.SGD(encoder.parameters(), lr=3e-4)
+    dec_optimizer = torch.optim.SGD(decoder.parameters(), lr=3e-4)
 
     train(trainX_loader, trainY_loader, encoder, decoder, enc_optimizer, dec_optimizer)
+
 
 if __name__ == '__main__':
     main()
