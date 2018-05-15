@@ -1,4 +1,4 @@
-from layers1 import Seq2SeqAttention
+from layers import Seq2SeqAttention
 from torch.utils.data import DataLoader
 import utils
 import torch
@@ -24,7 +24,7 @@ device = torch.device(("cuda:%d" % args.gpu) if args.gpu != -1 else "cpu")
 print(device)
 
 
-def train(trainX_loader, trainY_loader, model, optimizer, epochs=1):
+def train(trainX_loader, trainY_loader, model, optimizer, scheduler, epochs=1):
 	for epoch in range(epochs):
 		for _, (batchX, batchY) in enumerate(zip(trainX_loader, trainY_loader)):
 
@@ -36,6 +36,7 @@ def train(trainX_loader, trainY_loader, model, optimizer, epochs=1):
 
 			loss.backward(retain_graph=True)
 			optimizer.step()
+			scheduler.step()
 
 
 def main():
@@ -62,9 +63,10 @@ def main():
 	trainY_loader = DataLoader(trainY, batch_size=BATCH_SIZE, num_workers=2)
 
 	model = Seq2SeqAttention(trainX.vocab_size, EMB_DIM, HID_DIM, BATCH_SIZE, device, max_trg_len=25).cuda(device)
-	optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
+	optimizer = torch.optim.SGD(model.parameters(), lr=3e-5)
+	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.3)
 
-	train(trainX_loader, trainY_loader, model, optimizer)
+	train(trainX_loader, trainY_loader, model, optimizer, scheduler)
 
 
 if __name__ == '__main__':
