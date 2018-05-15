@@ -27,7 +27,7 @@ def build_vocab(filelist=['data/PART_I.article', 'data/PART_I.summary'],
 
 
 def load_data(filename, max_len=100, n_data=None, data_dir='./data/',
-            vocab_file='vocab.json', st='<s>', ed = '</s>', unk='<unk>'):
+            vocab_file='vocab.json', st='<s>', ed='</s>', unk='<unk>'):
     
     if not os.path.exists(data_dir + vocab_file):
         build_vocab()
