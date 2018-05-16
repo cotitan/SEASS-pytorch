@@ -2,8 +2,8 @@
 <project version="4">
   <component name="WebServers">
     <option name="servers">
-      <webServer id="14214e0b-3d04-4f70-a9c4-8a35be34e0db" name="lab" url="http://lab">
-        <fileTransfer host="lab" port="22" accessType="SFTP">
+      <webServer id="14214e0b-3d04-4f70-a9c4-8a35be34e0db" name="Neptune1" url="http://Neptune1">
+        <fileTransfer host="Neptune1" port="22" accessType="SFTP">
           <advancedOptions>
             <advancedOptions dataProtectionLevel="Private" />
           </advancedOptions>

@@ -1,9 +1,9 @@
 import os
-from collections import defaultdict
 import json
 import numpy as np
-from torch.utils.data import Dataset
-import torch
+from collections import defaultdict
+from torch.utils.data import Dataset, DataLoader
+
 
 def build_vocab(filelist=['data/PART_I.article', 'data/PART_I.summary'],
                 vocab_file='data/vocab.json', low_freq_bound=5):
@@ -48,15 +48,14 @@ def load_data(filename, max_len=100, n_data=None, data_dir='./data/',
         
         datas.append(sample)
 
-    return np.array(datas, np.long), vocab
+    return np.array(datas, np.long)
 
 
 class MyDatasets(Dataset):
     def __init__(self, filename, max_len=100, n_data=None, data_dir='data/',
                 vocab_file='vocab.json', st='<s>', ed='</s>', unk='<unk>'):
         self._max_len = max_len
-        self.datas, self.vocab = load_data(filename, max_len, n_data, data_dir, vocab_file, st, ed, unk)
-        self.vocab_size = len(self.vocab)
+        self.datas = load_data(filename, max_len, n_data, data_dir, vocab_file, st, ed, unk)
         self._size = len(self.datas)
     
     def __getitem__(self, idx):
@@ -66,3 +65,7 @@ class MyDatasets(Dataset):
         return self._size
 
 
+def getDataLoader(filepath, max_len, n_data, batch_size, num_workers=2):
+    dataset = MyDatasets(filepath, max_len, n_data)
+    loader = DataLoader(dataset, batch_size, num_workers=num_workers)
+    return loader
