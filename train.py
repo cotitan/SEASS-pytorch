@@ -9,11 +9,11 @@ parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive
 
 parser.add_argument('--gpu', type=int, default='1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_epochs', type=int, default=1, help='Number of epochs [default: 3]')
-parser.add_argument('--n_train', type=int, default=200,
+parser.add_argument('--n_train', type=int, default=600000,
 					help='Number of training data (up to 3803957 in gigaword) [default: 3803957]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
-parser.add_argument('--batch_size', type=int, default=32, help='Mini batch size [default: 32]')
+parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
 parser.add_argument('--emb_dim', type=int, default=200, help='Embedding size [default: 256]')
 parser.add_argument('--hid_dim', type=int, default=256, help='Hidden state size [default: 256]')
 parser.add_argument('--maxout_dim', type=int, default=2, help='Maxout size [default: 2]')
@@ -85,7 +85,7 @@ def main():
 		model.load_state_dict(torch.load(file))
 		print('Load model parameters from %s' % file)
 
-	optimizer = torch.optim.SGD(model.parameters(), lr=3e-5)
+	optimizer = torch.optim.SGD(model.parameters(), lr=1e-5)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100000, gamma=0.3)
 
 	train(trainX, trainY, validX, validY, model, optimizer, scheduler, N_EPOCHS)

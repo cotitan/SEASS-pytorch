@@ -3,12 +3,13 @@ from torch import nn
 
 
 class Seq2SeqAttention(nn.Module):
-	def __init__(self, vocab_size, emb_dim, hid_dim, batch_size, device, max_trg_len=25):
+	def __init__(self, vocab_size, emb_dim, hid_dim, batch_size, device, beam_size=3, max_trg_len=25):
 		super(Seq2SeqAttention, self).__init__()
 		self.vocab_size = vocab_size
 		self.emb_dim = emb_dim
 		self.hid_dim = hid_dim
 		self.batch_size = batch_size
+		self.beam_size = beam_size
 		self.enc_hidden = None
 		self.dec_hidden = None
 		self.device = torch.device('cpu') if device is None else device
@@ -45,10 +46,46 @@ class Seq2SeqAttention(nn.Module):
 		states = states * sGate
 		return states, self.enc_hidden
 
-	def decode(self, enc_states, enc_hidden, test=False, sentence=None):
+	def decode(self, enc_states, enc_hidden, test=False, sentence=None, vocab=None, st='<s>', ed='</s>'):
+		batch_size = enc_states.shape[1]
 		if test:
 			# TODO: beam search
-			pass
+			with torch.no_grad():
+				self.hidden = enc_hidden.view(1, -1, self.hid_dim)
+				attn_1 = self.attn_layer1(enc_states)
+				beam_size = self.beam_size
+
+				hidden_prev = torch.cat([self.hidden]*beam_size)
+				word_prev = torch.tensor([[vocab[st]]*beam_size]*batch_size, device=self.device)
+				acc_prob = torch.zeros(batch_size, beam_size, device=self.device)
+				summaries = torch.zeros(batch_size, beam_size, self.max_trg_len, device=self.device)
+
+				summaries[:, 0] = word_prev
+
+				for i in range(self.max_trg_len - 1):
+					dec_hidden = torch.zeros(batch_size, beam_size, self.vocab_size, device=self.device)
+
+					probs = torch.zeros(beam_size, self.vocab_size, device=self.device)
+					for j in range(beam_size):
+						embeds = self.embedding_lookup(word_prev[:, j]).view(1, -1, self.emb_dim)
+						attn_2 = self.attn_layer2(embeds)
+						# len*batch*dim + 1*batch*dim; should be added for each elem in
+						attn_weights = self.softmax((attn_1 + attn_2).view(batch_size, -1))
+						c_t = torch.sum(attn_weights.view(-1, batch_size, 1) * enc_states, dim=0).view(1, -1, self.hid_dim)  #
+						dec_states, dec_hidden[j] = self.GRUdecoder(torch.cat((embeds, c_t), dim=-1), hidden_prev[j])
+						probs[:, j] += acc_prob[:, j] - torch.log(self.softmax(self.linear_vocab(dec_states)))
+
+					values, indices = torch.topk(probs.view(batch_size, -1), k=beam_size, largest=False)
+					acc_prob = values
+					summaries_cur = torch.tensor(summaries, device=self.device)
+					for j in range(beam_size):
+						hidden_prev[j] = dec_hidden[indices[j]//self.vocab_size]
+						word_prev[:, j] = indices[:, j] % self.vocab_size
+						summaries_cur[:, j] = summaries[indices[:, j] // self.vocab_size]
+						summaries_cur[:, j][i+1] = word_prev[:, j]
+				_, indices = torch.topk(acc_prob, k=1, largest=False)
+				return summaries[indices]
+
 		else:
 			self.hidden = enc_hidden.view(1, -1, self.hid_dim)
 			attn_1 = self.attn_layer1(enc_states)
@@ -59,8 +96,8 @@ class Seq2SeqAttention(nn.Module):
 				# len*batch*dim + 1*batch*dim; should be added for each elem in 7s
 				attn_weights = self.softmax((attn_1 + attn_2).view(len(sentence), -1))
 				c_t = torch.sum(attn_weights.view(-1, len(sentence), 1) * enc_states, dim=0).view(1, -1, self.hid_dim)  #
-				dec_out, self.dec_hidden = self.GRUdecoder(torch.cat((embeds, c_t), dim=-1), self.hidden)
-				probs = self.softmax(self.linear_vocab(self.hidden))
+				dec_states, self.dec_hidden = self.GRUdecoder(torch.cat((embeds, c_t), dim=-1), self.hidden)
+				probs = self.softmax(self.linear_vocab(dec_states))
 				for j in range(len(sentence)):
 					loss += -torch.log(probs[:, j, sentence[j, i + 1]])
 			return loss / len(sentence)
