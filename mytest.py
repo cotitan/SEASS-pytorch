@@ -36,13 +36,25 @@ def validate(validX, validY, model):
 		print('validation loss:', loss)
 
 
-def mytest(validX, validY, model):
+def mytest(validX, validY, model, st='<s>', ed='</s>'):
+	i2w = {key: value for value, key in model.vocab.items()}
+
 	with torch.no_grad():
 		for _, (batchX, batchY) in enumerate(zip(validX, validY)):
 			batchX = torch.tensor(batchX, dtype=torch.long, device=device)
 			batchY = torch.tensor(batchY, dtype=torch.long, device=device)
 			summaries = model(batchX, batchY, test=True)
-			print(summaries[0])
+
+			sums = summaries.cpu().numpy().squeeze()
+
+			for i in range(sums.shape[0]):
+				line = ''
+				for idx in sums[i][1:]:
+					if idx == model.vocab[ed]:
+						print(line)
+						break
+					else:
+						line += str(i2w[int(idx)])
 
 
 def main():
