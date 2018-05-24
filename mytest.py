@@ -7,13 +7,14 @@ from layers import Seq2SeqAttention
 
 parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in DyNet')
 
-parser.add_argument('--gpu', type=int, default='1', help='GPU ID to use. For cpu, set -1 [default: -1]')
+parser.add_argument('--gpu', type=int, default='0', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
 parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
 parser.add_argument('--emb_dim', type=int, default=200, help='Embedding size [default: 256]')
 parser.add_argument('--hid_dim', type=int, default=256, help='Hidden state size [default: 256]')
 parser.add_argument('--maxout_dim', type=int, default=2, help='Maxout size [default: 2]')
+parser.add_argument('--model_file', type=str, default='./models/params_0.pkl', help='Maxout size [default: 2]')
 args = parser.parse_args()
 print(args)
 
@@ -73,8 +74,8 @@ def main():
 	vocab = json.load(open('data/vocab.json'))
 	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25).cuda(device)
 
-	if os.path.exists(model_dir) and len(os.listdir(model_dir)) > 0:
-		file = os.path.join(model_dir, os.listdir(model_dir)[-1])
+	file = args.model_file
+	if os.path.exists(file):
 		model.load_state_dict(torch.load(file))
 		print('Load model parameters from %s' % file)
 

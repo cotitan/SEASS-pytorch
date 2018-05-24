@@ -65,7 +65,7 @@ class MyDatasets(Dataset):
         return self._size
 
 
-def getDataLoader(filepath, max_len, n_data, batch_size, num_workers=3):
+def getDataLoader(filepath, max_len, n_data, batch_size, num_workers=2):
     dataset = MyDatasets(filepath, max_len, n_data)
     loader = DataLoader(dataset, batch_size, num_workers=num_workers)
     return loader

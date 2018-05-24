@@ -3,13 +3,14 @@ import json
 import utils
 import torch
 import argparse
+import time
 from layers import Seq2SeqAttention
 
 parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in DyNet')
 
 parser.add_argument('--gpu', type=int, default='1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_epochs', type=int, default=1, help='Number of epochs [default: 3]')
-parser.add_argument('--n_train', type=int, default=200000,
+parser.add_argument('--n_train', type=int, default=600000,
 					help='Number of training data (up to 3803957 in gigaword) [default: 3803957]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
@@ -17,6 +18,7 @@ parser.add_argument('--batch_size', type=int, default=32, help='Mini batch size 
 parser.add_argument('--emb_dim', type=int, default=200, help='Embedding size [default: 256]')
 parser.add_argument('--hid_dim', type=int, default=256, help='Hidden state size [default: 256]')
 parser.add_argument('--maxout_dim', type=int, default=2, help='Maxout size [default: 2]')
+parser.add_argument('--model_file', type=str, default='./models/params_0.pkl')
 args = parser.parse_args()
 
 model_dir = './models'
@@ -38,12 +40,19 @@ def validate(validX, validY, model):
 
 def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1):
 	steps = 0
+	counts = 1
+	start = time.time()
 	for epoch in range(epochs):
 		for _, (batchX, batchY) in enumerate(zip(trainX, trainY)):
+			optimizer.zero_grad()
+
 			batchX = torch.tensor(batchX, dtype=torch.long, device=device)
 			batchY = torch.tensor(batchY, dtype=torch.long, device=device)
 			loss = model(batchX, batchY)
 			loss.backward(retain_graph=True)
+
+			torch.nn.utils.clip_grad_value_(model.parameters(), 20)
+
 			optimizer.step()
 			scheduler.step()
 
@@ -54,10 +63,18 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 				# print('step %d, training loss = %f' % (steps, train_loss))
 				print('step %d, training loss = %f, validation loss = %f' % (steps, train_loss, valid_loss))
 
+				if steps*trainX.batch_size % 320000 == 0:
+					torch.save(model.state_dict(), os.path.join(model_dir, 'params_%d.pkl' % counts))
+					print('Model saved in dir %s' % model_dir)
+					counts += 1
+
 		validate(validX, validY, model)
 		# torch.save(model, 'model_%d.pkl' % epoch)
 		torch.save(model.state_dict(), os.path.join(model_dir, 'params_%d.pkl' % epoch))
 		print('Model saved in dir %s' % model_dir)
+	end = time.time()
+	span = end - start
+	print('%dh%dmin spent on training' % (int(span / 3600), int(span % 3600) / 60))
 
 
 def main():
@@ -84,13 +101,14 @@ def main():
 	vocab = json.load(open('data/vocab.json'))
 	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25).cuda(device)
 
-	if os.path.exists(model_dir) and len(os.listdir(model_dir)) > 0:
+	model_file = args.model_file
+	if os.path.exists(model_file):
 		file = os.path.join(model_dir, os.listdir(model_dir)[-1])
-		model.load_state_dict(torch.load(file))
-		print('Load model parameters from %s' % file)
+		model.load_state_dict(torch.load(model_file))
+		print('Load model parameters from %s' % model_file)
 
-	optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
-	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.3)
+	optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
+	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.3)
 
 	train(trainX, trainY, validX, validY, model, optimizer, scheduler, N_EPOCHS)
 
