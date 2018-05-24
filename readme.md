@@ -8,5 +8,6 @@
 
 ### TODO LIST
 1. Implement maxout layer
+2. ROUGE metric
 2. Change Bahdanaum attention to Luong attention
 3. Fix bugs on decoder
