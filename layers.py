@@ -2,6 +2,23 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+class AttentionGRUCell(nn.Module):
+	def __init__(self, vocab_size, emb_dim, hid_dim):
+		self.dec_hid_weights = nn.Linear(hid_dim, 1)
+		self.enc_hid_weights = nn.Linear(hid_dim, 1)
+		self.GRUCell = nn.GRUCell(hid_dim + emb_dim, hid_dim)
+		self.decoder2vocab = nn.Linear(hid_dim, vocab_size)
+
+	def forward(self, hidden_prev, word_emb, encoder_states):
+		# (1,batch,1)+(len,batch,1)=(len,batch,1)
+		e_t = self.dec_hid_weights(hidden_prev) + self.enc_hid_weights(encoder_states)
+		attn_weights = F.softmax(e_t, dim=0)
+		c_t = torch.sum(attn_weights * encoder_states, dim=0)
+		inputs = torch_cat([c_t, word_emb], dim=-1)
+		_, hidden = self.GRUCell(inputs, hidden_prev)
+		logits = F.softmax(self.decoder2vocab(hidden), dim=-1)
+		return hidden, logits
+
 
 class Seq2SeqAttention(nn.Module):
 	def __init__(self, vocab_size, emb_dim, hid_dim, batch_size, vocab, device, beam_size=3, max_trg_len=25):
@@ -24,10 +41,9 @@ class Seq2SeqAttention(nn.Module):
 		self.sigmoid = nn.Sigmoid()
 
 		# decoder
-		self.GRUdecoder = nn.GRU(emb_dim + hid_dim, hid_dim)
-		self.linear_vocab = nn.Linear(hid_dim, vocab_size)
-		self.attn_layer1 = nn.Linear(self.hid_dim, 1)
-		self.attn_layer2 = nn.Linear(self.hid_dim, 1)
+		self.decoderCell = AttentionGRUCell(self.vocab_size, self.emb_dim, self.hid_dim)
+
+		self.loss_function = nn.CrossEntropyLoss()
 
 	def init_hidden(self, batch_size):
 		return torch.zeros(2, batch_size, self.hid_dim // 2, device=self.device)
@@ -112,18 +128,10 @@ class Seq2SeqAttention(nn.Module):
 				return summary
 
 		else:
-			attn_1 = self.attn_layer1(enc_states)
 			loss = torch.zeros(1, device=self.device)
+			hidden_prev = enc_hidden
 			for i in range(self.max_trg_len - 1):
 				embeds = self.embedding_lookup(sentence[:, i]).view(1, -1, self.emb_dim)
-				attn_2 = self.attn_layer2(dec_hidden)
-				# len*batch*1 + 1*batch*1
-				attn_weights = F.softmax(attn_1 + attn_2, dim=0)
-				c_t = torch.sum(attn_weights * enc_states, dim=0).view(1, -1, self.hid_dim)
-				dec_states, dec_hidden = self.GRUdecoder(torch.cat((embeds, c_t), dim=-1), dec_hidden)
-				probs = F.softmax(self.linear_vocab(dec_states), dim=-1)
-				for j in range(len(sentence)):
-					if sentence[j, i+1] != self.vocab[ed]:
-						loss += -torch.log(probs[:, j, sentence[j, i + 1]])
+				hidden_prev, logits = self.decoderCell(hidden_prev, embeds, enc_states)
+				loss += self.loss_function(logits, sentence[:,i])
 			return loss / len(sentence)
-
