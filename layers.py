@@ -15,7 +15,7 @@ class AttentionGRUCell(nn.Module):
 		e_t = self.dec_hid_weights(hidden_prev) + self.enc_hid_weights(encoder_states)
 		attn_weights = F.softmax(e_t, dim=0)
 		c_t = torch.sum(attn_weights * encoder_states, dim=0)
-		inputs = torch_cat([c_t, word_emb], dim=-1)
+		inputs = torch.cat([c_t, word_emb], dim=-1)
 		_, hidden = self.GRUCell(inputs, hidden_prev)
 		logits = F.softmax(self.decoder2vocab(hidden), dim=-1)
 		return hidden, logits
