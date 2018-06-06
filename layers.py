@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 class AttentionGRUCell(nn.Module):
 	def __init__(self, vocab_size, emb_dim, hid_dim):
+		super(AttentionGRUCell, self).__init__()
 		self.dec_hid_weights = nn.Linear(hid_dim, 1)
 		self.enc_hid_weights = nn.Linear(hid_dim, 1)
 		self.GRUCell = nn.GRUCell(hid_dim + emb_dim, hid_dim)
