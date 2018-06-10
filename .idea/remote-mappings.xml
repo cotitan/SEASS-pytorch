@@ -17,6 +17,13 @@
             </list>
           </settings>
         </remote-mappings>
+        <remote-mappings server-id="python@ssh://tiankeke@amax2:51122/home/tiankeke/anaconda3/bin/python">
+          <settings>
+            <list>
+              <mapping local-root="$PROJECT_DIR$" remote-root="/home/tiankeke/workspace/SEASS-pytorch" />
+            </list>
+          </settings>
+        </remote-mappings>
       </list>
     </list>
   </component>

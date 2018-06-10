@@ -3,22 +3,25 @@ from torch import nn
 import torch.nn.functional as F
 
 class AttentionGRUCell(nn.Module):
-	def __init__(self, vocab_size, emb_dim, hid_dim):
+	def __init__(self, vocab_size, emb_dim, hid_dim, mlp_hid_dim=100):
 		super(AttentionGRUCell, self).__init__()
 		self.hid_dim = hid_dim
-		self.dec_hid_weights = nn.Linear(hid_dim, 1)
-		self.enc_hid_weights = nn.Linear(hid_dim, 1)
+		self.mlp_hid_dim = mlp_hid_dim
+		self.dec_hid_weights = nn.Linear(hid_dim, mlp_hid_dim)
+		self.enc_hid_weights = nn.Linear(hid_dim, mlp_hid_dim)
+		self.mlp_out = nn.Linear(mlp_hid_dim, 1)
 		self.GRUCell = nn.GRUCell(hid_dim + emb_dim, hid_dim)
 		self.decoder2vocab = nn.Linear(hid_dim, vocab_size)
 
 	def forward(self, hidden_prev, word_emb, encoder_states):
 		# (1,batch,1)+(len,batch,1)=(len,batch,1)
-		e_t = self.dec_hid_weights(hidden_prev) + self.enc_hid_weights(encoder_states)
+		e_t = self.mlp_out(
+			F.tanh(self.dec_hid_weights(hidden_prev) + self.enc_hid_weights(encoder_states)))
 		attn_weights = F.softmax(e_t, dim=0)
-		c_t = torch.sum(attn_weights * encoder_states, dim=0).view(1, -1, self.hid_dim)
+		c_t = torch.sum(attn_weights * encoder_states, dim=0)
 		inputs = torch.cat([c_t, word_emb], dim=-1)
-		_, hidden = self.GRUCell(inputs, hidden_prev)
-		logits = F.softmax(self.decoder2vocab(hidden), dim=-1)
+		hidden = self.GRUCell(inputs, hidden_prev)
+		logits = self.decoder2vocab(hidden)
 		return hidden, logits
 
 
@@ -45,7 +48,9 @@ class Seq2SeqAttention(nn.Module):
 		# decoder
 		self.decoderCell = AttentionGRUCell(self.vocab_size, self.emb_dim, self.hid_dim)
 
-		self.loss_function = nn.CrossEntropyLoss()
+		weight_mask = torch.ones(vocab_size)
+		weight_mask[vocab['</s>']] = 0
+		self.loss_function = nn.CrossEntropyLoss(weight=weight_mask)
 
 	def init_hidden(self, batch_size):
 		return torch.zeros(2, batch_size, self.hid_dim // 2, device=self.device)
@@ -64,65 +69,53 @@ class Seq2SeqAttention(nn.Module):
 		states = states * sGate
 		return states, enc_hidden
 
+	def beam_search(self, hidden_prev, probs):
+		# hidden_prev: beam_size*batch*dim
+		# probs: batch * beam_size * vocab_size
+		values, indices = torch.topk(probs.view(self.batch_size, -1), k=self.beam_size, largest=False)
+		acc_probs = values
+		hidden_ids = indices / self.vocab_size
+		words = indices % self.vocab_size
+		hidden = torch.zeros(self.beam_size, self.batch_size, self.hid_dim, device=self.device)
+		for i in range(self.beam_size):
+			for j in range(self.batch_size):
+				hidden[i,j,:] = hidden_prev[hidden_ids[j, i], j, :]
+		return hidden, acc_probs, words
+
 	def decode(self, enc_states, enc_hidden, test=False, sentence=None, st='<s>', ed='</s>'):
 		batch_size = enc_states.shape[1]
-		dec_hidden = enc_hidden
+		beam_size = self.beam_size
 		if test:
 			# TODO: beam search
 			with torch.no_grad():
-				attn_1 = self.attn_layer1(enc_states)
-				beam_size = self.beam_size
+				# 1st step, choose top K to gain the 1st word
+				words = torch.tensor([self.vocab[st]]*batch_size, device=self.device)
+				embeds = self.embedding_lookup(words)
+				hidden, logits = self.decoderCell(enc_hidden.squeeze(), embeds, enc_states)
+				probs = -torch.log(F.softmax(logits, dim=-1))
+				hidden, acc_probs, words = self.beam_search(hidden.view(1, -1, self.hid_dim), probs)
 
-				h_prev = torch.cat([dec_hidden]*beam_size)  # shape=(beam_size, batch_size, hid_dim)
-				word_prev = torch.tensor([[self.vocab[st]]*beam_size]*batch_size, device=self.device)
 				summaries = torch.zeros(batch_size, beam_size, self.max_trg_len, device=self.device)
+				summaries[:, :, 0] = words
 
-				summaries[:, :, 0] = word_prev
-
-				embeds = self.embedding_lookup(word_prev[:, 0]).view(1, -1, self.emb_dim)
-				attn_2 = self.attn_layer2(dec_hidden)
-				attn_weights = F.softmax(attn_1 + attn_2, dim=0)
-				c_t = torch.sum(attn_weights * enc_states, dim=0).view(1, -1, self.hid_dim)
-				dec_states, dec_hidden = self.GRUdecoder(torch.cat([embeds, c_t], dim=-1), dec_hidden)
-				probs = - torch.log(F.softmax(self.linear_vocab(dec_states.view(-1, self.hid_dim)), dim=-1))
-
-				values, indices = torch.topk(probs.view(batch_size, -1), k=beam_size, largest=False)
-				acc_prob = values
-				word_prev = indices
-
-				summaries[:, :, 1] = word_prev
-
-				for j in range(beam_size):
-					h_prev[j] = dec_hidden
+				dec_hidden = torch.zeros(beam_size, batch_size, self.hid_dim, device=self.device)
+				probs = torch.zeros(batch_size, beam_size, self.vocab_size, device=self.device)
 
 				for i in range(1, self.max_trg_len - 1):
-					dec_hidden = torch.zeros(batch_size, beam_size, self.hid_dim, device=self.device)
 
-					probs = torch.zeros(batch_size, beam_size, self.vocab_size, device=self.device)
 					for j in range(beam_size):
-						embeds = self.embedding_lookup(word_prev[:, j]).view(1, -1, self.emb_dim)
-						attn_2 = self.attn_layer2(h_prev[j])
-						# len*batch*1 + 1*batch*1
-						attn_weights = F.softmax(attn_1 + attn_2, dim=0)
-						c_t = torch.sum(attn_weights * enc_states, dim=0).view(1, -1, self.hid_dim)
+						embeds = self.embedding_lookup(words[:,j])
+						dec_hidden[j], logits = self.decoderCell(hidden[j], embeds, enc_states)
+						mask = torch.ones(batch_size, 1, device=self.device)
+						mask[words[:,j]==self.vocab['</s>']] = 0
+						probs[:, j] = acc_probs[:, j].view(-1, 1) - torch.log(
+								F.softmax(logits, dim=-1)) * mask
 
-						dec_states, dec_hidden[:, j] = self.GRUdecoder(
-								torch.cat([embeds, c_t], dim=-1), h_prev[j].view(1, -1, self.hid_dim))
-						probs[:, j] = acc_prob[:, j].view(-1, 1) - torch.log(
-										F.softmax(self.linear_vocab(dec_states.view(-1, self.hid_dim)), dim=-1))
+					hidden, acc_probs, words = self.beam_search(dec_hidden, probs)
 
-					values, indices = torch.topk(probs.view(batch_size, -1), k=beam_size, largest=False)
-					acc_prob = values
-					summaries_cur = torch.tensor(summaries, device=self.device)
-					for j in range(beam_size):
-						for k in range(batch_size):
-							h_prev[j, k, :] = dec_hidden[k, indices[k, j]/self.vocab_size, :]
-						word_prev[:, j] = indices[:, j] % self.vocab_size
-						for k in range(batch_size):
-							summaries_cur[k, j] = summaries[k, indices[k, j]/self.vocab_size, :]
-							summaries_cur[k, j, i+1] = word_prev[k, j]
-					summaries = summaries_cur
-				_, indices = torch.topk(acc_prob, k=1, largest=False)
+					summaries[:, :, i] = words
+
+				_, indices = torch.topk(acc_probs, k=1, largest=False)
 
 				summary = torch.zeros(batch_size, self.max_trg_len, device=self.device)
 				for i in range(batch_size):
@@ -131,9 +124,9 @@ class Seq2SeqAttention(nn.Module):
 
 		else:
 			loss = torch.zeros(1, device=self.device)
-			hidden_prev = enc_hidden
+			hidden_prev = enc_hidden.squeeze()
 			for i in range(self.max_trg_len - 1):
-				embeds = self.embedding_lookup(sentence[:, i]).view(1, -1, self.emb_dim)
+				embeds = self.embedding_lookup(sentence[:, i])
 				hidden_prev, logits = self.decoderCell(hidden_prev, embeds, enc_states)
 				loss += self.loss_function(logits, sentence[:,i])
 			return loss / len(sentence)

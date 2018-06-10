@@ -56,6 +56,7 @@ def mytest(validX, validY, model, st='<s>', ed='</s>'):
 						break
 					else:
 						line += str(i2w[int(idx)])
+				print(line)
 
 
 def main():

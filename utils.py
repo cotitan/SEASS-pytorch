@@ -22,13 +22,13 @@ def build_vocab(filelist=['data/PART_I.article', 'data/PART_I.summary'],
         if freq[word]>=low_freq_bound:
             vocab[word] = len(vocab)
     print('Number of filtered words: %d, %f%% ' % (len(vocab), len(vocab)/len(freq)*100))
-    
+
     json.dump(vocab, open(vocab_file,'w'))
 
 
 def load_data(filename, max_len=100, n_data=None, data_dir='./data/',
             vocab_file='vocab.json', st='<s>', ed='</s>', unk='<unk>'):
-    
+
     if not os.path.exists(data_dir + vocab_file):
         build_vocab()
     vocab = json.load(open(data_dir + vocab_file))
@@ -45,7 +45,7 @@ def load_data(filename, max_len=100, n_data=None, data_dir='./data/',
         words = line.strip().split()
         for i in range(min(len(words), max_len-2)):
             sample[i+1] = vocab[words[i]] if words[i] in vocab else vocab[unk]
-        
+
         datas.append(sample)
 
     return np.array(datas, np.long)
@@ -65,7 +65,7 @@ class MyDatasets(Dataset):
         return self._size
 
 
-def getDataLoader(filepath, max_len, n_data, batch_size, num_workers=2):
+def getDataLoader(filepath, max_len, n_data, batch_size, num_workers=1):
     dataset = MyDatasets(filepath, max_len, n_data)
     loader = DataLoader(dataset, batch_size, num_workers=num_workers)
     return loader
