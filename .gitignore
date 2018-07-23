@@ -2,4 +2,5 @@
 /models/*
 /.idea/*
 /__pycache__/
+/*.tar.gz
 *~

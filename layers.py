@@ -2,6 +2,27 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+
+class DotAttention(nn.Module):
+	"""
+	Dot attention calculation
+	"""
+	def __init__(self):
+		super(DotAttention, self).__init__()
+
+	def forward(self, enc_states, h_prev):
+		"""
+		calculate the context vector c_t, both the input and output are batch first
+		:param enc_states: the encoder states, in shape [batch, seq_len, dim]
+		:param h_prev: the previous states of decoder, h_{t-1}, in shape [1, batch, dim]
+		:return: c_t: context vector
+		"""
+		alpha_t = torch.bmm(h_prev.transpose(0,1), enc_states.transpose(1,2)) # [batch, 1, seq_len]
+		alpha_t = F.softmax(alpha_t, dim=-1)
+		c_t = torch.bmm(alpha_t, enc_states) # [batch, 1, dim]
+		return c_t
+
+
 class AttentionGRUCell(nn.Module):
 	def __init__(self, vocab_size, emb_dim, hid_dim, mlp_hid_dim=100):
 		super(AttentionGRUCell, self).__init__()
@@ -40,13 +61,17 @@ class Seq2SeqAttention(nn.Module):
 		self.embedding_lookup = nn.Embedding(vocab_size, emb_dim)
 
 		# encoder
-		self.biGRU = nn.GRU(emb_dim, hid_dim//2, bidirectional=True)
+		self.biGRU = nn.GRU(emb_dim, hid_dim//2, batch_first=True, bidirectional=True)
 		self.linear1 = nn.Linear(hid_dim, hid_dim)
 		self.linear2 = nn.Linear(hid_dim, hid_dim)
 		self.sigmoid = nn.Sigmoid()
 
-		# decoder
+		# decoder,
 		self.decoderCell = AttentionGRUCell(self.vocab_size, self.emb_dim, self.hid_dim)
+		self.GRUdecoder = nn.GRU(emb_dim + hid_dim, hid_dim, batch_first=True)
+		self.dotAttention = DotAttention()
+		self.decoder2vocab = nn.Linear(hid_dim, vocab_size)
+		self.init_decoder_hidden = nn.Linear(hid_dim//2, hid_dim)
 
 		weight_mask = torch.ones(vocab_size)
 		weight_mask[vocab['</s>']] = 0
@@ -57,15 +82,21 @@ class Seq2SeqAttention(nn.Module):
 
 	def forward(self, src_sentence, trg_sentence, test=False):
 		enc_states, enc_hidden = self.encode(src_sentence)
-		res = self.decode(enc_states, enc_hidden, test, trg_sentence)
-		return res  # loss or summaries
+		res = self.greedyDecoder(enc_states, enc_hidden, test, trg_sentence)
+		return res  # logits or summaries
 
 	def encode(self, sentence):
-		embeds = self.embedding_lookup(sentence).transpose(0, 1)
-		enc_hidden = self.init_hidden(len(sentence))
-		states, enc_hidden = self.biGRU(embeds, enc_hidden)
-		enc_hidden = torch.cat([enc_hidden[0], enc_hidden[1]], dim=-1).view(1, -1, self.hid_dim)
-		sGate = self.sigmoid(self.linear1(states) + self.linear2(enc_hidden))
+		"""
+		Selective encoding
+		:param sentence:  shape of [batch, seq_len]
+		:return: states: encoder states, enc_hidden: the last state of encoder
+		"""
+		embeds = self.embedding_lookup(sentence) # [batch, seq_len, word_dim]
+		enc_hidden = self.init_hidden(len(sentence)) # [batch, 2, hid_dim/2]
+		states, enc_hidden = self.biGRU(embeds, enc_hidden) # [batch, seq_len, hid_dim], [batch, 2, hid_dim/2]
+		s_n = torch.cat([enc_hidden[0,:,:], enc_hidden[1,:,:]], dim=-1).view(self.batch_size, 1, self.hid_dim)
+		# [batch, seq_len, hid_dim] + [batch, 1, hid_dim] = [batch, seq_len, hid_dim]
+		sGate = self.sigmoid(self.linear1(states) + self.linear2(s_n))
 		states = states * sGate
 		return states, enc_hidden
 
@@ -81,6 +112,44 @@ class Seq2SeqAttention(nn.Module):
 			for j in range(self.batch_size):
 				hidden[i,j,:] = hidden_prev[hidden_ids[j, i], j, :]
 		return hidden, acc_probs, words
+
+	def decoderStep(self, enc_states, hidden, word):
+		embeds = self.embedding_lookup(word).view(self.batch_size, 1, self.emb_dim) # [batch, 1, dim]
+		c_t = self.dotAttention(enc_states, hidden) # [batch, 1, dim]
+		outputs, hidden = self.GRUdecoder(torch.cat([embeds, c_t], dim=-1), hidden)
+		logits = F.softmax(self.decoder2vocab(outputs), dim=-1) # [batch, 1, vocab_size]
+		return logits, hidden
+
+	def greedyDecoder(self, enc_states, hidden, test=False, sentence=None, st='<s>', ed='</s>'):
+		"""
+		Decoder with greedy search
+		:param enc_states:
+		:param hidden: shape = [2, batch, hid_dim/2]
+		:param test: boolean value, test or train
+		:param sentence:
+		:param st:
+		:param ed:
+		:return:
+		"""
+		# according to paper
+		hidden = F.tanh(self.init_decoder_hidden(hidden[1])).view(1, self.batch_size, self.hid_dim)
+		if test:
+			word = torch.ones(self.batch_size) * self.vocab[st]
+			words = [word]
+			for i in range(self.max_trg_len-1):
+				logit, hidden = self.decoderStep(enc_states, hidden, word)
+				word = torch.argmax(logit, dim=-1).squeeze()
+				words.append(word)
+			words.append(torch.ones(self.batch_size) * self.vocab[ed])
+			return words
+		else:
+			logits = torch.zeros(self.batch_size, self.max_trg_len, self.vocab_size)
+			for i in range(self.max_trg_len - 1):
+				# logit: [batch, 1, vocab_size]
+				logit, hidden = self.decoderStep(enc_states, hidden, sentence[:,i])
+				logits[:,i,:] = logit
+			logits[:,-1,:] = torch.ones(self.batch_size, 1, self.vocab_size) * self.vocab[ed]
+			return logits
 
 	def decode(self, enc_states, enc_hidden, test=False, sentence=None, st='<s>', ed='</s>'):
 		batch_size = enc_states.shape[1]

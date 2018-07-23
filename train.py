@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive
 
 parser.add_argument('--gpu', type=int, default='1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_epochs', type=int, default=1, help='Number of epochs [default: 3]')
-parser.add_argument('--n_train', type=int, default=600000,
+parser.add_argument('--n_train', type=int, default=100000,
 					help='Number of training data (up to 3803957 in gigaword) [default: 3803957]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
@@ -48,7 +48,8 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 
 			batchX = torch.tensor(batchX, dtype=torch.long, device=device)
 			batchY = torch.tensor(batchY, dtype=torch.long, device=device)
-			loss = model(batchX, batchY)
+			logits = model(batchX, batchY)
+			loss = model.loss_function(logits, batchY)
 			loss.backward(retain_graph=True)
 
 			torch.nn.utils.clip_grad_value_(model.parameters(), 20)
