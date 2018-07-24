@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive
 
 parser.add_argument('--gpu', type=int, default='-1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_epochs', type=int, default=1, help='Number of epochs [default: 3]')
-parser.add_argument('--n_train', type=int, default=600000,
+parser.add_argument('--n_train', type=int, default=60000,
 					help='Number of training data (up to 3803957 in gigaword) [default: 3803957]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
@@ -90,17 +90,22 @@ def main():
 	HID_DIM = args.hid_dim
 	MAXOUT_DIM = args.maxout_dim
 
-	TRAIN_X = 'PART_I.article'
-	TRAIN_Y = 'PART_I.summary'
-	VALID_X = 'PART_III.article'
-	VALID_Y = 'PART_III.summary'
+	data_dir = 'sumdata/'
+	TRAIN_X = 'sumdata/train/train.article.txt'
+	TRAIN_Y = 'sumdata/train/train.title.txt'
+	VALID_X = 'sumdata/train/valid.article.filter.txt'
+	VALID_Y = 'sumdata/train/valid.title.filter.txt'
 
-	trainX = utils.getDataLoader(TRAIN_X, max_len=100, n_data=N_TRAIN, batch_size=BATCH_SIZE)
-	trainY = utils.getDataLoader(TRAIN_Y, max_len=25, n_data=N_TRAIN, batch_size=BATCH_SIZE)
-	validX = utils.getDataLoader(VALID_X, max_len=100, n_data=N_VALID, batch_size=BATCH_SIZE)
-	validY = utils.getDataLoader(VALID_Y, max_len=25, n_data=N_VALID, batch_size=BATCH_SIZE)
+	vocab_file = os.path.join(data_dir, "vocab.json")
+	if not os.path.exists(vocab_file):
+		utils.build_vocab([TRAIN_X, TRAIN_Y], vocab_file)
+	vocab = json.load(open(vocab_file))
 
-	vocab = json.load(open('data/vocab.json'))
+	trainX = utils.getDataLoader(TRAIN_X, vocab, max_len=100, n_data=N_TRAIN, batch_size=BATCH_SIZE)
+	trainY = utils.getDataLoader(TRAIN_Y, vocab, max_len=25, n_data=N_TRAIN, batch_size=BATCH_SIZE)
+	validX = utils.getDataLoader(VALID_X, vocab, max_len=100, n_data=N_VALID, batch_size=BATCH_SIZE)
+	validY = utils.getDataLoader(VALID_Y, vocab, max_len=25, n_data=N_VALID, batch_size=BATCH_SIZE)
+
 	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25)
 
 	model_file = args.model_file

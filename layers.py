@@ -75,8 +75,8 @@ class Seq2SeqAttention(nn.Module):
 
 		weight_mask = torch.ones(vocab_size).cpu()
 		weight_mask[vocab['</s>']] = 0
-		self.loss_function = nn.CrossEntropyLoss(weight=weight_mask)
-		# self.loss_function = nn.CrossEntropyLoss()
+		# self.loss_function = nn.CrossEntropyLoss(weight=weight_mask)
+		self.loss_function = nn.CrossEntropyLoss(ignore_index=self.vocab['</s>'])
 
 	def init_hidden(self, batch_size):
 		return torch.zeros(2, batch_size, self.hid_dim // 2, device=self.device)
