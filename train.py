@@ -8,9 +8,9 @@ from layers import Seq2SeqAttention
 
 parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in DyNet')
 
-parser.add_argument('--gpu', type=int, default='1', help='GPU ID to use. For cpu, set -1 [default: -1]')
+parser.add_argument('--gpu', type=int, default='-1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_epochs', type=int, default=1, help='Number of epochs [default: 3]')
-parser.add_argument('--n_train', type=int, default=100000,
+parser.add_argument('--n_train', type=int, default=600000,
 					help='Number of training data (up to 3803957 in gigaword) [default: 3803957]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
@@ -34,7 +34,8 @@ def validate(validX, validY, model):
 		for _, (batchX, batchY) in enumerate(zip(validX, validY)):
 			batchX = torch.tensor(batchX, dtype=torch.long, device=device)
 			batchY = torch.tensor(batchY, dtype=torch.long, device=device)
-			loss = model(batchX, batchY).cpu().numpy()
+			logits = model(batchX, batchY)
+			loss = model.loss_function(logits.transpose(1, 2), batchY)
 			return loss
 
 
@@ -49,7 +50,7 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 			batchX = torch.tensor(batchX, dtype=torch.long, device=device)
 			batchY = torch.tensor(batchY, dtype=torch.long, device=device)
 			logits = model(batchX, batchY)
-			loss = model.loss_function(logits, batchY)
+			loss = model.loss_function(logits.transpose(1,2), batchY)
 			loss.backward(retain_graph=True)
 
 			torch.nn.utils.clip_grad_value_(model.parameters(), 20)
@@ -58,7 +59,7 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 			scheduler.step()
 
 			steps += 1
-			if steps % 10 == 0:
+			if steps % 2 == 0:
 				train_loss = loss.cpu().detach().numpy()
 				valid_loss = validate(validX, validY, model)
 				# print('step %d, training loss = %f' % (steps, train_loss))
@@ -100,7 +101,7 @@ def main():
 	validY = utils.getDataLoader(VALID_Y, max_len=25, n_data=N_VALID, batch_size=BATCH_SIZE)
 
 	vocab = json.load(open('data/vocab.json'))
-	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25).cuda(device)
+	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25)
 
 	model_file = args.model_file
 	if os.path.exists(model_file):

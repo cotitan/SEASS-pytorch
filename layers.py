@@ -73,9 +73,10 @@ class Seq2SeqAttention(nn.Module):
 		self.decoder2vocab = nn.Linear(hid_dim, vocab_size)
 		self.init_decoder_hidden = nn.Linear(hid_dim//2, hid_dim)
 
-		weight_mask = torch.ones(vocab_size)
+		weight_mask = torch.ones(vocab_size).cpu()
 		weight_mask[vocab['</s>']] = 0
 		self.loss_function = nn.CrossEntropyLoss(weight=weight_mask)
+		# self.loss_function = nn.CrossEntropyLoss()
 
 	def init_hidden(self, batch_size):
 		return torch.zeros(2, batch_size, self.hid_dim // 2, device=self.device)
@@ -127,9 +128,9 @@ class Seq2SeqAttention(nn.Module):
 		:param hidden: shape = [2, batch, hid_dim/2]
 		:param test: boolean value, test or train
 		:param sentence:
-		:param st:
+		:param st: start token
 		:param ed:
-		:return:
+		:return: logits
 		"""
 		# according to paper
 		hidden = F.tanh(self.init_decoder_hidden(hidden[1])).view(1, self.batch_size, self.hid_dim)
@@ -143,12 +144,11 @@ class Seq2SeqAttention(nn.Module):
 			words.append(torch.ones(self.batch_size) * self.vocab[ed])
 			return words
 		else:
-			logits = torch.zeros(self.batch_size, self.max_trg_len, self.vocab_size)
+			logits = torch.zeros(self.batch_size, self.max_trg_len, self.vocab_size, device=self.device)
 			for i in range(self.max_trg_len - 1):
 				# logit: [batch, 1, vocab_size]
 				logit, hidden = self.decoderStep(enc_states, hidden, sentence[:,i])
-				logits[:,i,:] = logit
-			logits[:,-1,:] = torch.ones(self.batch_size, 1, self.vocab_size) * self.vocab[ed]
+				logits[:,i,:] = logit.squeeze()
 			return logits
 
 	def decode(self, enc_states, enc_hidden, test=False, sentence=None, st='<s>', ed='</s>'):
