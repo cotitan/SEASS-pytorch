@@ -56,8 +56,8 @@ def validate(validX, validY, model):
 	with torch.no_grad():
 		for _, (batchX, batchY) in enumerate(zip(validX, validY)):
 			if args.gpu != -1:
-				batchX = torch.cuda.LongTensor(batchX)
-				batchY = torch.cuda.LongTensor(batchY)
+				batchX = torch.tensor(batchX, dtype = torch.long, device=device)
+				batchY = torch.tensor(batchY, dtype = torch.long, device=device)
 			logits = model(batchX, batchY)
 			loss = calc_loss(logits, batchY[:,1:], model) # exclude start token
 			return loss
@@ -69,9 +69,8 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 			optimizer.zero_grad()
 
 			if args.gpu != -1:
-				batchX = torch.cuda.LongTensor(batchX)
-				batchY = torch.cuda.LongTensor(batchY)
-			print(type(batchX))
+				batchX = torch.tensor(batchX, dtype = torch.long, device=device)
+				batchY = torch.tensor(batchY, dtype = torch.long, device=device)
 			logits = model(batchX, batchY)
 			loss = calc_loss(logits, batchY[:,1:], model) # exclude start token
 			loss.backward()
@@ -122,7 +121,7 @@ def main():
 
 	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25)
 	if args.gpu != -1:
-		model = model.cuda()
+		model = model.cuda(device)
 
 	model_file = args.model_file
 	if os.path.exists(model_file):
