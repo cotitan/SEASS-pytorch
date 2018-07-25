@@ -30,10 +30,12 @@ device = torch.device(("cuda:%d" % args.gpu) if args.gpu != -1 else "cpu")
 print('using device', device)
 
 def calc_loss(logits, batchY, model):
+	loss = model.loss_function(logits.transpose(1,2), batchY)
+	return loss
 	loss = torch.zeros(1)
-	for i in range(batchY.shape[1]):
-		loss += model.loss_function(logits[:, i, :], batchY[:, i])
-	loss /= batchY.shape[1]
+	for i in range(model.batch_size):
+		loss += model.loss_function(logits[i, :, :], batchY[i, :])
+	loss /= model.batch_size
 	return loss
 
 def validate(validX, validY, model):
@@ -56,8 +58,8 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 			# batchX = pack(batchX)
 			# batchY = pack(batchX)
 			logits = model(batchX, batchY)
-			loss = calc_loss(logits, batchY, model)
-			loss.backward(retain_graph=True)
+			loss = calc_loss(logits[:,1:,:], batchY[:,1:], model)
+			loss.backward()
 
 			torch.nn.utils.clip_grad_value_(model.parameters(), 20)
 

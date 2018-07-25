@@ -76,7 +76,9 @@ class Seq2SeqAttention(nn.Module):
 		weight_mask = torch.ones(vocab_size).cpu()
 		weight_mask[vocab['</s>']] = 0
 		# self.loss_function = nn.CrossEntropyLoss(weight=weight_mask)
-		self.loss_function = nn.CrossEntropyLoss(ignore_index=self.vocab['</s>'])
+		# self.loss_function = nn.CrossEntropyLoss(ignore_index=self.vocab['</s>'])
+		# using the above two loss function will lead to loss don't decrease, don't know why
+		self.loss_function = nn.CrossEntropyLoss()
 
 	def init_hidden(self, batch_size):
 		return torch.zeros(2, batch_size, self.hid_dim // 2, device=self.device)
@@ -93,8 +95,8 @@ class Seq2SeqAttention(nn.Module):
 		:return: states: encoder states, enc_hidden: the last state of encoder
 		"""
 		embeds = self.embedding_lookup(sentence) # [batch, seq_len, word_dim]
-		enc_hidden = self.init_hidden(len(sentence)) # [batch, 2, hid_dim/2]
-		states, enc_hidden = self.biGRU(embeds, enc_hidden) # [batch, seq_len, hid_dim], [batch, 2, hid_dim/2]
+		enc_hidden = self.init_hidden(len(sentence)) # [2, batch, hid_dim/2]
+		states, enc_hidden = self.biGRU(embeds, enc_hidden) # [batch, seq_len, hid_dim], [2, batch, hid_dim/2]
 		s_n = torch.cat([enc_hidden[0,:,:], enc_hidden[1,:,:]], dim=-1).view(self.batch_size, 1, self.hid_dim)
 		# [batch, seq_len, hid_dim] + [batch, 1, hid_dim] = [batch, seq_len, hid_dim]
 		sGate = self.sigmoid(self.linear1(states) + self.linear2(s_n))
@@ -118,7 +120,7 @@ class Seq2SeqAttention(nn.Module):
 		embeds = self.embedding_lookup(word).view(self.batch_size, 1, self.emb_dim) # [batch, 1, dim]
 		c_t = self.dotAttention(enc_states, hidden) # [batch, 1, dim]
 		outputs, hidden = self.GRUdecoder(torch.cat([embeds, c_t], dim=-1), hidden)
-		logits = F.softmax(self.decoder2vocab(outputs), dim=-1) # [batch, 1, vocab_size]
+		logits = self.decoder2vocab(outputs) # [batch, 1, vocab_size]
 		return logits, hidden
 
 	def greedyDecoder(self, enc_states, hidden, test=False, sentence=None, st='<s>', ed='</s>'):
@@ -149,7 +151,7 @@ class Seq2SeqAttention(nn.Module):
 			for i in range(max_seq_len - 1):
 				# logit: [batch, 1, vocab_size]
 				logit, hidden = self.decoderStep(enc_states, hidden, sentence[:,i])
-				logits[:,i,:] = logit.squeeze()
+				logits[:,i+1,:] = logit.squeeze()
 			return logits
 
 	def decode(self, enc_states, enc_hidden, test=False, sentence=None, st='<s>', ed='</s>'):
