@@ -55,6 +55,9 @@ def calc_loss(logits, batchY, model):
 def validate(validX, validY, model):
 	with torch.no_grad():
 		for _, (batchX, batchY) in enumerate(zip(validX, validY)):
+			if args.gpu != -1:
+				batchX = torch.cuda.LongTensor(batchX)
+				batchY = torch.cuda.LongTensor(batchY)
 			logits = model(batchX, batchY)
 			loss = calc_loss(logits, batchY[:,1:], model) # exclude start token
 			return loss
@@ -65,6 +68,10 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 		for idx, (batchX, batchY) in enumerate(zip(trainX, trainY)):
 			optimizer.zero_grad()
 
+			if args.gpu != -1:
+				batchX = torch.cuda.LongTensor(batchX)
+				batchY = torch.cuda.LongTensor(batchY)
+			print(type(batchX))
 			logits = model(batchX, batchY)
 			loss = calc_loss(logits, batchY[:,1:], model) # exclude start token
 			loss.backward()
@@ -108,12 +115,14 @@ def main():
 		utils.build_vocab([TRAIN_X, TRAIN_Y], vocab_file)
 	vocab = json.load(open(vocab_file))
 
-	trainX = utils.getDataLoader(TRAIN_X, vocab, max_len=100, n_data=N_TRAIN, batch_size=BATCH_SIZE)
-	trainY = utils.getDataLoader(TRAIN_Y, vocab, max_len=25, n_data=N_TRAIN, batch_size=BATCH_SIZE)
-	validX = utils.getDataLoader(VALID_X, vocab, max_len=100, n_data=N_VALID, batch_size=BATCH_SIZE)
-	validY = utils.getDataLoader(VALID_Y, vocab, max_len=25, n_data=N_VALID, batch_size=BATCH_SIZE)
+	trainX = utils.getDataLoader(TRAIN_X, vocab, n_data=N_TRAIN, batch_size=BATCH_SIZE)
+	trainY = utils.getDataLoader(TRAIN_Y, vocab, n_data=N_TRAIN, batch_size=BATCH_SIZE)
+	validX = utils.getDataLoader(VALID_X, vocab, n_data=N_VALID, batch_size=BATCH_SIZE)
+	validY = utils.getDataLoader(VALID_Y, vocab, n_data=N_VALID, batch_size=BATCH_SIZE)
 
 	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25)
+	if args.gpu != -1:
+		model = model.cuda()
 
 	model_file = args.model_file
 	if os.path.exists(model_file):

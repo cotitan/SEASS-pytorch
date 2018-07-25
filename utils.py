@@ -83,8 +83,7 @@ def load_data(filename, vocab, n_data=None):
 	return datas
 
 class MyDatasets(Dataset):
-	def __init__(self, filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', unk='UNK'):
-		self._max_len = max_len
+	def __init__(self, filename, vocab, n_data=None, st='<s>', ed='</s>', unk='UNK'):
 		self.datas = load_data(filename, vocab, n_data)
 		self._size = len(self.datas)
 	
@@ -95,7 +94,7 @@ class MyDatasets(Dataset):
 		return self._size
 
 
-def getDataLoader(filepath, vocab, max_len, n_data, batch_size, num_workers=1):
-	dataset = MyDatasets(filepath, vocab, max_len, n_data)
+def getDataLoader(filepath, vocab, n_data, batch_size, num_workers=1):
+	dataset = MyDatasets(filepath, vocab, n_data)
 	loader = DataLoader(dataset, batch_size, num_workers=num_workers, collate_fn=myCollate(vocab[pad_tok]))
 	return loader
