@@ -5,6 +5,7 @@ import torch
 import argparse
 import time
 from layers import Seq2SeqAttention
+from torch.nn.utils.rnn import pack_padded_sequence, pad_sequence
 
 parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in DyNet')
 
@@ -28,16 +29,21 @@ if not os.path.exists(model_dir):
 device = torch.device(("cuda:%d" % args.gpu) if args.gpu != -1 else "cpu")
 print('using device', device)
 
+def calc_loss(logits, batchY, model):
+	loss = torch.zeros(1)
+	for i in range(batchY.shape[1]):
+		loss += model.loss_function(logits[:, i, :], batchY[:, i])
+	loss /= batchY.shape[1]
+	return loss
 
 def validate(validX, validY, model):
 	with torch.no_grad():
 		for _, (batchX, batchY) in enumerate(zip(validX, validY)):
-			batchX = torch.tensor(batchX, dtype=torch.long, device=device)
-			batchY = torch.tensor(batchY, dtype=torch.long, device=device)
+			# batchX = pack(batchX)
+			# batchY = pack(batchX)
 			logits = model(batchX, batchY)
-			loss = model.loss_function(logits.transpose(1, 2), batchY)
+			loss = calc_loss(logits, batchY, model)
 			return loss
-
 
 def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1):
 	steps = 0
@@ -47,10 +53,10 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 		for _, (batchX, batchY) in enumerate(zip(trainX, trainY)):
 			optimizer.zero_grad()
 
-			batchX = torch.tensor(batchX, dtype=torch.long, device=device)
-			batchY = torch.tensor(batchY, dtype=torch.long, device=device)
+			# batchX = pack(batchX)
+			# batchY = pack(batchX)
 			logits = model(batchX, batchY)
-			loss = model.loss_function(logits.transpose(1,2), batchY)
+			loss = calc_loss(logits, batchY, model)
 			loss.backward(retain_graph=True)
 
 			torch.nn.utils.clip_grad_value_(model.parameters(), 20)

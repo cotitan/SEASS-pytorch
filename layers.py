@@ -144,8 +144,9 @@ class Seq2SeqAttention(nn.Module):
 			words.append(torch.ones(self.batch_size) * self.vocab[ed])
 			return words
 		else:
-			logits = torch.zeros(self.batch_size, self.max_trg_len, self.vocab_size, device=self.device)
-			for i in range(self.max_trg_len - 1):
+			max_seq_len = sentence.shape[1]
+			logits = torch.zeros(self.batch_size, max_seq_len, self.vocab_size, device=self.device)
+			for i in range(max_seq_len - 1):
 				# logit: [batch, 1, vocab_size]
 				logit, hidden = self.decoderStep(enc_states, hidden, sentence[:,i])
 				logits[:,i,:] = logit.squeeze()
