@@ -52,7 +52,6 @@ class Seq2SeqAttention(nn.Module):
 		self.vocab_size = vocab_size
 		self.emb_dim = emb_dim
 		self.hid_dim = hid_dim
-		self.batch_size = batch_size
 		self.beam_size = beam_size
 		self.vocab = vocab
 		self.device = torch.device('cpu') if device is None else device
@@ -94,10 +93,11 @@ class Seq2SeqAttention(nn.Module):
 		:param sentence:  shape of [batch, seq_len]
 		:return: states: encoder states, enc_hidden: the last state of encoder
 		"""
+		batch_size = sentence.shape[0]
 		embeds = self.embedding_lookup(sentence) # [batch, seq_len, word_dim]
 		enc_hidden = self.init_hidden(len(sentence)) # [2, batch, hid_dim/2]
 		states, enc_hidden = self.biGRU(embeds, enc_hidden) # [batch, seq_len, hid_dim], [2, batch, hid_dim/2]
-		s_n = torch.cat([enc_hidden[0,:,:], enc_hidden[1,:,:]], dim=-1).view(self.batch_size, 1, self.hid_dim)
+		s_n = torch.cat([enc_hidden[0,:,:], enc_hidden[1,:,:]], dim=-1).view(batch_size, 1, self.hid_dim)
 		# [batch, seq_len, hid_dim] + [batch, 1, hid_dim] = [batch, seq_len, hid_dim]
 		sGate = self.sigmoid(self.linear1(states) + self.linear2(s_n))
 		states = states * sGate
@@ -106,18 +106,19 @@ class Seq2SeqAttention(nn.Module):
 	def beam_search(self, hidden_prev, probs):
 		# hidden_prev: beam_size*batch*dim
 		# probs: batch * beam_size * vocab_size
-		values, indices = torch.topk(probs.view(self.batch_size, -1), k=self.beam_size, largest=False)
+		batch_size = hidden_prev.shape[1]
+		values, indices = torch.topk(probs.view(batch_size, -1), k=self.beam_size, largest=False)
 		acc_probs = values
 		hidden_ids = indices / self.vocab_size
 		words = indices % self.vocab_size
-		hidden = torch.zeros(self.beam_size, self.batch_size, self.hid_dim, device=self.device)
+		hidden = torch.zeros(self.beam_size, batch_size, self.hid_dim, device=self.device)
 		for i in range(self.beam_size):
-			for j in range(self.batch_size):
+			for j in range(batch_size):
 				hidden[i,j,:] = hidden_prev[hidden_ids[j, i], j, :]
 		return hidden, acc_probs, words
 
 	def decoderStep(self, enc_states, hidden, word):
-		embeds = self.embedding_lookup(word).view(self.batch_size, 1, self.emb_dim) # [batch, 1, dim]
+		embeds = self.embedding_lookup(word).view(-1, 1, self.emb_dim) # [batch, 1, dim]
 		c_t = self.dotAttention(enc_states, hidden) # [batch, 1, dim]
 		outputs, hidden = self.GRUdecoder(torch.cat([embeds, c_t], dim=-1), hidden)
 		logits = self.decoder2vocab(outputs) # [batch, 1, vocab_size]
@@ -134,24 +135,25 @@ class Seq2SeqAttention(nn.Module):
 		:param ed:
 		:return: logits
 		"""
+		batch_size = hidden.shape[1]
 		# according to paper
-		hidden = F.tanh(self.init_decoder_hidden(hidden[1])).view(1, self.batch_size, self.hid_dim)
+		hidden = F.tanh(self.init_decoder_hidden(hidden[1])).view(1, batch_size, self.hid_dim)
 		if test:
-			word = torch.ones(self.batch_size) * self.vocab[st]
+			word = torch.ones(batch_size) * self.vocab[st]
 			words = [word]
 			for i in range(self.max_trg_len-1):
 				logit, hidden = self.decoderStep(enc_states, hidden, word)
 				word = torch.argmax(logit, dim=-1).squeeze()
 				words.append(word)
-			words.append(torch.ones(self.batch_size) * self.vocab[ed])
+			words.append(torch.ones(batch_size) * self.vocab[ed])
 			return words
 		else:
 			max_seq_len = sentence.shape[1]
-			logits = torch.zeros(self.batch_size, max_seq_len, self.vocab_size, device=self.device)
+			logits = torch.zeros(batch_size, max_seq_len-1, self.vocab_size, device=self.device)
 			for i in range(max_seq_len - 1):
 				# logit: [batch, 1, vocab_size]
 				logit, hidden = self.decoderStep(enc_states, hidden, sentence[:,i])
-				logits[:,i+1,:] = logit.squeeze()
+				logits[:,i,:] = logit.squeeze()
 			return logits
 
 	def decode(self, enc_states, enc_hidden, test=False, sentence=None, st='<s>', ed='</s>'):

@@ -1,13 +1,17 @@
-import os
 import json
 import numpy as np
 from collections import defaultdict
 from torch.utils.data import Dataset, DataLoader
-from torch.nn.utils.rnn import pack_padded_sequence, pad_sequence
+from torch.nn.utils.rnn import pad_sequence
 import torch
 
+st = "<s>"
+ed = "</s>"
+unk = "UNK"
+pad_tok = "<pad>"
+
 class myCollate:
-	def __init__(self, pad_value=1):
+	def __init__(self, pad_value=3):
 		self.pad_value = pad_value
 		
 	def collate_fn(self, batch_data):
@@ -22,7 +26,7 @@ class myCollate:
 		return self.collate_fn(batch_data)
 
 def build_vocab(filelist=['data/PART_I.article', 'data/PART_I.summary'],
-				vocab_file='data/vocab.json', low_freq_bound=5):
+				vocab_file='data/vocab.json', min_count=20):
 	print("Building vocab...")
 	freq = defaultdict(int)
 	for file in filelist:
@@ -33,15 +37,16 @@ def build_vocab(filelist=['data/PART_I.article', 'data/PART_I.summary'],
 		fin.close()
 	print('Number of all words: %d' % len(freq))
 	
-	vocab = {'<s>': 0, '</s>': 1, 'UNK': 2}
+	vocab = {'<s>': 0, '</s>': 1, 'UNK': 2, '<pad>': 3}
 	if 'UNK' in freq:
 		freq.pop('UNK')
 	for word in freq:
-		if freq[word]>=low_freq_bound:
+		if freq[word] > min_count:
 			vocab[word] = len(vocab)
 	print('Number of filtered words: %d, %f%% ' % (len(vocab), len(vocab)/len(freq)*100))
 
 	json.dump(vocab, open(vocab_file,'w'))
+	return freq
 
 
 def load_data_with_padding(filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', unk='UNK'):
@@ -63,7 +68,7 @@ def load_data_with_padding(filename, vocab, max_len=100, n_data=None, st='<s>', 
 	return np.array(datas, np.long)
 
 
-def load_data(filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', unk='UNK'):
+def load_data(filename, vocab, n_data=None):
 
 	fin = open(filename, "r", encoding="utf8")
 	datas = []
@@ -72,7 +77,7 @@ def load_data(filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', un
 			break
 		words = line.strip().split()
 		sample = ['<s>'] + words + ['</s>']
-		sample = [vocab[w] for w in sample]
+		sample = [vocab[w if w in vocab else unk] for w in sample ]
 		datas.append(sample)
 
 	return datas
@@ -80,7 +85,7 @@ def load_data(filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', un
 class MyDatasets(Dataset):
 	def __init__(self, filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', unk='UNK'):
 		self._max_len = max_len
-		self.datas = load_data(filename, vocab, max_len, n_data, st, ed, unk)
+		self.datas = load_data(filename, vocab, n_data)
 		self._size = len(self.datas)
 	
 	def __getitem__(self, idx):
@@ -92,5 +97,5 @@ class MyDatasets(Dataset):
 
 def getDataLoader(filepath, vocab, max_len, n_data, batch_size, num_workers=1):
 	dataset = MyDatasets(filepath, vocab, max_len, n_data)
-	loader = DataLoader(dataset, batch_size, num_workers=num_workers, collate_fn=myCollate())
+	loader = DataLoader(dataset, batch_size, num_workers=num_workers, collate_fn=myCollate(vocab[pad_tok]))
 	return loader
