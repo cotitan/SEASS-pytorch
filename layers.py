@@ -139,13 +139,13 @@ class Seq2SeqAttention(nn.Module):
 		# according to paper
 		hidden = F.tanh(self.init_decoder_hidden(hidden[1])).view(1, batch_size, self.hid_dim)
 		if test:
-			word = torch.ones(batch_size) * self.vocab[st]
-			words = [word]
+			word = torch.ones(batch_size, dtype=torch.long, device=self.device) * self.vocab[st]
+			words = torch.zeros(batch_size, self.max_trg_len, dtype=torch.long, device=self.device)
 			for i in range(self.max_trg_len-1):
 				logit, hidden = self.decoderStep(enc_states, hidden, word)
 				word = torch.argmax(logit, dim=-1).squeeze()
-				words.append(word)
-			words.append(torch.ones(batch_size) * self.vocab[ed])
+				words[:,i] = word
+			words[:,-1] = torch.ones(batch_size, dtype=torch.long, device=self.device) * self.vocab[ed]
 			return words
 		else:
 			max_seq_len = sentence.shape[1]
