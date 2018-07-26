@@ -7,7 +7,7 @@ from layers import Seq2SeqAttention
 
 parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in DyNet')
 
-parser.add_argument('--gpu', type=int, default='1', help='GPU ID to use. For cpu, set -1 [default: -1]')
+parser.add_argument('--gpu', type=int, default='-1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
 parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
