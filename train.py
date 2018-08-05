@@ -3,7 +3,6 @@ import json
 import utils
 import torch
 import argparse
-import time
 from layers import Seq2SeqAttention
 import logging
 
@@ -90,6 +89,10 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 		torch.save(model.state_dict(), os.path.join(model_dir, 'params_%d.pkl' % epoch))
 		# print('Model saved in dir %s' % model_dir)
 		logging.info('Model saved in dir %s' % model_dir)
+
+
+def decode():
+	pass
 
 
 def main():

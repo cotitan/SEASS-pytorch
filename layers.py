@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from Beam import Beam
 
 
 class DotAttention(nn.Module):
@@ -85,6 +86,7 @@ class Seq2SeqAttention(nn.Module):
 	def forward(self, src_sentence, trg_sentence, test=False):
 		enc_states, enc_hidden = self.encode(src_sentence)
 		res = self.greedyDecoder(enc_states, enc_hidden, test, trg_sentence)
+		# res = self.beamSearchDecoder(enc_states, enc_hidden, test, trg_sentence)
 		return res  # logits or summaries
 
 	def encode(self, sentence):
@@ -103,19 +105,51 @@ class Seq2SeqAttention(nn.Module):
 		states = states * sGate
 		return states, enc_hidden
 
-	def beam_search(self, hidden_prev, probs):
-		# hidden_prev: beam_size*batch*dim
-		# probs: batch * beam_size * vocab_size
-		batch_size = hidden_prev.shape[1]
-		values, indices = torch.topk(probs.view(batch_size, -1), k=self.beam_size, largest=False)
-		acc_probs = values
-		hidden_ids = indices / self.vocab_size
-		words = indices % self.vocab_size
-		hidden = torch.zeros(self.beam_size, batch_size, self.hid_dim, device=self.device)
-		for i in range(self.beam_size):
-			for j in range(batch_size):
-				hidden[i,j,:] = hidden_prev[hidden_ids[j, i], j, :]
-		return hidden, acc_probs, words
+	def beamSearchDecoder(self, enc_states, hidden, test=False, sentence=None, st="<s>", ed="</s>", k=3):
+		"""
+		Decoder with beam search
+		:param enc_states:
+		:param hidden:
+		:param test:
+		:param sentence:
+		:param st:
+		:param ed:
+		:param k:
+		:return:
+		"""
+		batch_size = enc_states.shape[0]
+		hidden = F.tanh(self.init_decoder_hidden(hidden[1])).view(1, batch_size, self.hid_dim)
+		if test:
+			beams = [Beam(k, self.vocab, hidden[:,i,:], cuda=False) for i in range(batch_size)]
+
+			for i in range(self.max_trg_len):
+				for j in range(batch_size):
+					logits, hidden = self.decoderStep(enc_states[j].view(1, -1, self.hid_dim).expand(k, -1, -1),
+													  beams[j].get_hidden_state(),
+													  beams[j].get_current_word())
+					logLikelihood = torch.log(F.softmax(logits, dim=-1))
+					beams[j].advance(logLikelihood, hidden)
+
+			allHyp, allScores = [], []
+			n_best = 1
+			for b in range(batch_size):
+				scores, ks = beams[b].sort_best()
+
+				allScores += [scores[:n_best]]
+				hyps = [beams[b].get_hyp(k) for k in ks[:n_best]]
+				allHyp.append(hyps)
+
+			return allHyp
+			# return sentences
+		else:
+			max_seq_len = sentence.shape[1]
+			logits = torch.zeros(batch_size, max_seq_len - 1, self.vocab_size, device=self.device)
+			for i in range(max_seq_len - 1):
+				# logit: [batch, 1, vocab_size]
+				logit, hidden = self.decoderStep(enc_states, hidden, sentence[:, i])
+				logits[:, i, :] = logit.squeeze()
+			return logits
+
 
 	def decoderStep(self, enc_states, hidden, word):
 		embeds = self.embedding_lookup(word).view(-1, 1, self.emb_dim) # [batch, 1, dim]
@@ -155,52 +189,3 @@ class Seq2SeqAttention(nn.Module):
 				logit, hidden = self.decoderStep(enc_states, hidden, sentence[:,i])
 				logits[:,i,:] = logit.squeeze()
 			return logits
-
-	def decode(self, enc_states, enc_hidden, test=False, sentence=None, st='<s>', ed='</s>'):
-		batch_size = enc_states.shape[1]
-		beam_size = self.beam_size
-		if test:
-			# TODO: beam search
-			with torch.no_grad():
-				# 1st step, choose top K to gain the 1st word
-				words = torch.tensor([self.vocab[st]]*batch_size, device=self.device)
-				embeds = self.embedding_lookup(words)
-				hidden, logits = self.decoderCell(enc_hidden.squeeze(), embeds, enc_states)
-				probs = -torch.log(F.softmax(logits, dim=-1))
-				hidden, acc_probs, words = self.beam_search(hidden.view(1, -1, self.hid_dim), probs)
-
-				summaries = torch.zeros(batch_size, beam_size, self.max_trg_len, device=self.device)
-				summaries[:, :, 0] = words
-
-				dec_hidden = torch.zeros(beam_size, batch_size, self.hid_dim, device=self.device)
-				probs = torch.zeros(batch_size, beam_size, self.vocab_size, device=self.device)
-
-				for i in range(1, self.max_trg_len - 1):
-
-					for j in range(beam_size):
-						embeds = self.embedding_lookup(words[:,j])
-						dec_hidden[j], logits = self.decoderCell(hidden[j], embeds, enc_states)
-						mask = torch.ones(batch_size, 1, device=self.device)
-						mask[words[:,j]==self.vocab['</s>']] = 0
-						probs[:, j] = acc_probs[:, j].view(-1, 1) - torch.log(
-								F.softmax(logits, dim=-1)) * mask
-
-					hidden, acc_probs, words = self.beam_search(dec_hidden, probs)
-
-					summaries[:, :, i] = words
-
-				_, indices = torch.topk(acc_probs, k=1, largest=False)
-
-				summary = torch.zeros(batch_size, self.max_trg_len, device=self.device)
-				for i in range(batch_size):
-					summary[i] = summaries[i, indices[i], :]
-				return summary
-
-		else:
-			loss = torch.zeros(1, device=self.device)
-			hidden_prev = enc_hidden.squeeze()
-			for i in range(self.max_trg_len - 1):
-				embeds = self.embedding_lookup(sentence[:, i])
-				hidden_prev, logits = self.decoderCell(hidden_prev, embeds, enc_states)
-				loss += self.loss_function(logits, sentence[:,i])
-			return loss / len(sentence)

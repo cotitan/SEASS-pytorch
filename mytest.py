@@ -7,7 +7,7 @@ from layers import Seq2SeqAttention
 
 parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in DyNet')
 
-parser.add_argument('--gpu', type=int, default='1', help='GPU ID to use. For cpu, set -1 [default: -1]')
+parser.add_argument('--gpu', type=int, default='-1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
 parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
@@ -19,14 +19,33 @@ args = parser.parse_args()
 print(args)
 
 if not os.path.exists(args.model_file):
-	raise FileNotFoundError
+	raise FileNotFoundError("model file not found")
 
 device = torch.device(("cuda:%d" % args.gpu) if args.gpu != -1 else "cpu")
 print('using device', device)
 
+def printSum(summaries, vocab, st, ed):
+	i2w = {key: value for value, key in vocab.items()}
+	if isinstance(summaries, list):
+		for sum in summaries:
+			tokens = [i2w[int(idx.numpy())] for idx in sum[0]]
+			print(" ".join(tokens))
+
+	else:
+		sums = summaries.cpu().numpy().squeeze()
+		for i in range(sums.shape[0]):
+			line = ''
+			for idx in sums[i]:
+				if idx == vocab[ed]:
+					print(line)
+					break
+				else:
+					line += str(i2w[int(idx)]) + " "
+			print(line)
+
+
 ### test
 def mytest(validX, validY, model, st='<s>', ed='</s>'):
-	i2w = {key: value for value, key in model.vocab.items()}
 
 	with torch.no_grad():
 		for _, (batchX, batchY) in enumerate(zip(validX, validY)):
@@ -34,18 +53,7 @@ def mytest(validX, validY, model, st='<s>', ed='</s>'):
 				batchX = torch.tensor(batchX, dtype = torch.long, device=device)
 				batchY = torch.tensor(batchY, dtype = torch.long, device=device)
 			summaries = model(batchX, batchY, test=True)
-			sums = summaries.cpu().numpy().squeeze()
-
-			for i in range(sums.shape[0]):
-				line = ''
-				for idx in sums[i]:
-					if idx == model.vocab[ed]:
-						print(line)
-						break
-					else:
-						line += str(i2w[int(idx)]) + " "
-				print(line)
-
+			printSum(summaries, model.vocab, st, ed)
 
 def main():
 
