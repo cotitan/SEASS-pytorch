@@ -19,23 +19,23 @@ import torch
 class Beam(object):
     """Ordered beam of candidate outputs."""
 
-    def __init__(self, size, vocab, hidden, cuda=False):
+    def __init__(self, size, vocab, hidden, device):
         """Initialize params."""
         self.size = size
         self.done = False
         self.pad = vocab['<pad>']
         self.bos = vocab['<s>']
         self.eos = vocab['</s>']
-        self.tt = torch.cuda if cuda else torch
+        self.device = device
 
         # The score for each translation on the beam.
-        self.scores = self.tt.FloatTensor(size).zero_()
+        self.scores = torch.FloatTensor(size, device=self.device).zero_()
 
         # The backpointers at each time-step.
         self.prevKs = []
 
         # The outputs at each time-step.
-        self.nextYs = [self.tt.LongTensor(size).fill_(self.pad)]
+        self.nextYs = [torch.LongTensor(size, device=self.device).fill_(self.pad)]
         self.nextYs[0][0] = self.bos
 
         # the hidden state at current time-step

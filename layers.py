@@ -85,8 +85,8 @@ class Seq2SeqAttention(nn.Module):
 
 	def forward(self, src_sentence, trg_sentence, test=False):
 		enc_states, enc_hidden = self.encode(src_sentence)
-		res = self.greedyDecoder(enc_states, enc_hidden, test, trg_sentence)
-		# res = self.beamSearchDecoder(enc_states, enc_hidden, test, trg_sentence)
+		# res = self.greedyDecoder(enc_states, enc_hidden, test, trg_sentence)
+		res = self.beamSearchDecoder(enc_states, enc_hidden, test, trg_sentence)
 		return res  # logits or summaries
 
 	def encode(self, sentence):
@@ -120,7 +120,7 @@ class Seq2SeqAttention(nn.Module):
 		batch_size = enc_states.shape[0]
 		hidden = F.tanh(self.init_decoder_hidden(hidden[1])).view(1, batch_size, self.hid_dim)
 		if test:
-			beams = [Beam(k, self.vocab, hidden[:,i,:], cuda=False) for i in range(batch_size)]
+			beams = [Beam(k, self.vocab, hidden[:,i,:], self.device) for i in range(batch_size)]
 
 			for i in range(self.max_trg_len):
 				for j in range(batch_size):

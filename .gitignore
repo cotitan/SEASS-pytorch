@@ -1,6 +1,7 @@
 /data/*
 /models/*
 /.idea/*
+/log/*
 /__pycache__/
 /*.tar.gz
 /sumdata
