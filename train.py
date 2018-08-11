@@ -15,8 +15,8 @@ parser.add_argument('--n_train', type=int, default=100000,
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
 parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
-parser.add_argument('--emb_dim', type=int, default=200, help='Embedding size [default: 256]')
-parser.add_argument('--hid_dim', type=int, default=256, help='Hidden state size [default: 256]')
+parser.add_argument('--emb_dim', type=int, default=300, help='Embedding size [default: 256]')
+parser.add_argument('--hid_dim', type=int, default=512, help='Hidden state size [default: 256]')
 parser.add_argument('--maxout_dim', type=int, default=2, help='Maxout size [default: 2]')
 parser.add_argument('--model_file', type=str, default='./models/params_0.pkl')
 args = parser.parse_args()
@@ -86,6 +86,7 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 							 % (epoch, idx + 1, train_loss, valid_loss))
 
 		# torch.save(model, 'model_%d.pkl' % epoch)
+		model.cpu()
 		torch.save(model.state_dict(), os.path.join(model_dir, 'params_%d.pkl' % epoch))
 		# print('Model saved in dir %s' % model_dir)
 		logging.info('Model saved in dir %s' % model_dir)
@@ -132,7 +133,7 @@ def main():
 		logging.info('Load model parameters from %s' % model_file)
 		# print('Load model parameters from %s' % model_file)
 
-	optimizer = torch.optim.SGD(model.parameters(), lr=3e-2)
+	optimizer = torch.optim.Adam(model.parameters(), lr=3e-2)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.3)
 
 	train(trainX, trainY, validX, validY, model, optimizer, scheduler, N_EPOCHS)

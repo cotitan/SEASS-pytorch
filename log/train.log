@@ -1,3 +1,3 @@
-2018-08-05 11:46:00,566 - INFO - Start to train...
-2018-08-05 11:48:13,059 - INFO - epoch 0, step 10, training loss = 10.379262, validation loss = 9.935165
-2018-08-05 11:50:29,444 - INFO - epoch 0, step 20, training loss = 8.474876, validation loss = 8.349294
+2018-08-11 22:54:06,943 - INFO - Start to train...
+2018-08-11 22:55:43,480 - INFO - epoch 0, step 10, training loss = 10.274880, validation loss = 10.446520
+2018-08-11 22:57:27,007 - INFO - epoch 0, step 20, training loss = 10.502605, validation loss = 14.029221
