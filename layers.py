@@ -61,14 +61,14 @@ class Seq2SeqAttention(nn.Module):
 		self.embedding_lookup = nn.Embedding(vocab_size, emb_dim)
 
 		# encoder
-		self.biGRU = nn.GRU(emb_dim, hid_dim//2, batch_first=True, bidirectional=True)
+		self.biGRU = nn.GRU(emb_dim, hid_dim//2, batch_first=True, bidirectional=True, dropout=0.5)
 		self.linear1 = nn.Linear(hid_dim, hid_dim)
 		self.linear2 = nn.Linear(hid_dim, hid_dim)
 		self.sigmoid = nn.Sigmoid()
 
 		# decoder,
 		self.decoderCell = AttentionGRUCell(self.vocab_size, self.emb_dim, self.hid_dim)
-		self.GRUdecoder = nn.GRU(emb_dim + hid_dim, hid_dim, batch_first=True)
+		self.GRUdecoder = nn.GRU(emb_dim + hid_dim, hid_dim, batch_first=True, dropout=0.5)
 		self.dotAttention = DotAttention()
 		self.decoder2vocab = nn.Linear(hid_dim, vocab_size)
 		self.init_decoder_hidden = nn.Linear(hid_dim//2, hid_dim)
