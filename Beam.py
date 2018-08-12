@@ -129,3 +129,4 @@ class Beam(object):
             k = self.prevKs[j][k]
 
         return hyp[::-1]
+

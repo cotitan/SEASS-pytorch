@@ -11,8 +11,8 @@ parser.add_argument('--gpu', type=int, default='-1', help='GPU ID to use. For cp
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
 parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
-parser.add_argument('--emb_dim', type=int, default=200, help='Embedding size [default: 256]')
-parser.add_argument('--hid_dim', type=int, default=256, help='Hidden state size [default: 256]')
+parser.add_argument('--emb_dim', type=int, default=300, help='Embedding size [default: 256]')
+parser.add_argument('--hid_dim', type=int, default=512, help='Hidden state size [default: 256]')
 parser.add_argument('--maxout_dim', type=int, default=2, help='Maxout size [default: 2]')
 parser.add_argument('--model_file', type=str, default='./models/params_0.pkl', help='model file path')
 args = parser.parse_args()

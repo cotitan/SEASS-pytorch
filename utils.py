@@ -94,7 +94,7 @@ class MyDatasets(Dataset):
 		return self._size
 
 
-def getDataLoader(filepath, vocab, n_data, batch_size, num_workers=1):
+def getDataLoader(filepath, vocab, n_data, batch_size, num_workers=0):
 	dataset = MyDatasets(filepath, vocab, n_data)
 	loader = DataLoader(dataset, batch_size, num_workers=num_workers, collate_fn=myCollate(vocab[pad_tok]))
 	return loader
