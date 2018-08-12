@@ -9,7 +9,7 @@ import logging
 parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in DyNet')
 
 parser.add_argument('--gpu', type=int, default='-1', help='GPU ID to use. For cpu, set -1 [default: -1]')
-parser.add_argument('--n_epochs', type=int, default=1, help='Number of epochs [default: 3]')
+parser.add_argument('--n_epochs', type=int, default=5, help='Number of epochs [default: 3]')
 parser.add_argument('--n_train', type=int, default=100000,
 					help='Number of training data (up to 3803957 in gigaword) [default: 3803957]')
 parser.add_argument('--n_valid', type=int, default=189651,
@@ -76,7 +76,7 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 			torch.nn.utils.clip_grad_value_(model.parameters(), 20)
 
 			optimizer.step()
-			scheduler.step()
+			# scheduler.step()
 
 			if (idx + 1) % 10 == 0:
 				train_loss = loss.cpu().detach().numpy()
@@ -133,7 +133,7 @@ def main():
 		logging.info('Load model parameters from %s' % model_file)
 		# print('Load model parameters from %s' % model_file)
 
-	optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+	optimizer = torch.optim.Adam(model.parameters(), lr=0.0003)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.3)
 
 	train(trainX, trainY, validX, validY, model, optimizer, scheduler, N_EPOCHS)
