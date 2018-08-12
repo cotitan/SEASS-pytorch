@@ -27,15 +27,15 @@ class Beam(object):
         self.bos = vocab['<s>']
         self.eos = vocab['</s>']
         self.device = device
-
+        self.tt = torch.cuda if device.type == "cuda" else torch
         # The score for each translation on the beam.
-        self.scores = torch.FloatTensor(size, device=self.device).zero_()
+        self.scores = self.tt.FloatTensor(size, device=self.device).zero_()
 
         # The backpointers at each time-step.
         self.prevKs = []
 
         # The outputs at each time-step.
-        self.nextYs = [torch.LongTensor(size, device=self.device).fill_(self.pad)]
+        self.nextYs = [self.tt.LongTensor(size, device=self.device).fill_(self.pad)]
         self.nextYs[0][0] = self.bos
 
         # the hidden state at current time-step

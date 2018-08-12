@@ -154,7 +154,7 @@ class Seq2SeqAttention(nn.Module):
 	def decoderStep(self, enc_states, hidden, word):
 		embeds = self.embedding_lookup(word).view(-1, 1, self.emb_dim) # [batch, 1, dim]
 		c_t = self.dotAttention(enc_states, hidden) # [batch, 1, dim]
-		outputs, hidden = self.GRUdecoder(torch.cat([embeds, c_t], dim=-1), hidden)
+		outputs, hidden = self.GRUdecoder(torch.cat([embeds, c_t], dim=-1), hidden.contiguous())
 		logits = self.decoder2vocab(outputs) # [batch, 1, vocab_size]
 		return logits, hidden
 
