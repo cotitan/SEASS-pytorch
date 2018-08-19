@@ -4,10 +4,11 @@
 
 ### Requirments
 - torch==0.4.0
-- numpy==1.12.1
+- numpy==1.12.1+
+- python=3.5+
 
 ### Noticement
-1. When running train.py, the console may print out EOFError or ConnectionResetError, which is caused by DataLoader module of pytorch. I don't know why but it does not influence the training process. Neglect It!
+1. ~~When running train.py, the console may print out EOFError or ConnectionResetError, which is caused by DataLoader module of pytorch. I don't know why but it does not influence the training process. Neglect It!~~ Set num_workers=0 (argument of DataLoader) to avoid this error messages.
 2. This project haven't finish yet, there are bugs to be fix, and modules to be implement.
 
 ### How-to
@@ -15,8 +16,8 @@
 2. Run _python mytest.py_ to generate summaries
 
 
-### TODO LIST
+### TODO
 1. Implement maxout layer
 2. ROUGE metric
-2. Change Bahdanaum attention to Luong attention
-3. Fix bugs on decoder
+2. Attention calculation
+3. ~~Fix bugs on decoder~~ 

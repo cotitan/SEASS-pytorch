@@ -48,7 +48,7 @@ class AttentionGRUCell(nn.Module):
 
 
 class Seq2SeqAttention(nn.Module):
-	def __init__(self, vocab_size, emb_dim, hid_dim, batch_size, vocab, device, beam_size=3, max_trg_len=25):
+	def __init__(self, vocab_size, emb_dim, hid_dim, batch_size, vocab, device, beam_size=3, max_trg_len=25, dropout=0.0):
 		super(Seq2SeqAttention, self).__init__()
 		self.vocab_size = vocab_size
 		self.emb_dim = emb_dim
@@ -61,14 +61,14 @@ class Seq2SeqAttention(nn.Module):
 		self.embedding_lookup = nn.Embedding(vocab_size, emb_dim)
 
 		# encoder
-		self.biGRU = nn.GRU(emb_dim, hid_dim//2, batch_first=True, bidirectional=True, dropout=0.5)
+		self.biGRU = nn.GRU(emb_dim, hid_dim//2, batch_first=True, bidirectional=True, dropout=dropout)
 		self.linear1 = nn.Linear(hid_dim, hid_dim)
 		self.linear2 = nn.Linear(hid_dim, hid_dim)
 		self.sigmoid = nn.Sigmoid()
 
 		# decoder,
 		self.decoderCell = AttentionGRUCell(self.vocab_size, self.emb_dim, self.hid_dim)
-		self.GRUdecoder = nn.GRU(emb_dim + hid_dim, hid_dim, batch_first=True, dropout=0.5)
+		self.GRUdecoder = nn.GRU(emb_dim + hid_dim, hid_dim, batch_first=True, dropout=dropout)
 		self.dotAttention = DotAttention()
 		self.decoder2vocab = nn.Linear(hid_dim, vocab_size)
 		self.init_decoder_hidden = nn.Linear(hid_dim//2, hid_dim)
@@ -153,7 +153,7 @@ class Seq2SeqAttention(nn.Module):
 
 	def decoderStep(self, enc_states, hidden, word):
 		embeds = self.embedding_lookup(word).view(-1, 1, self.emb_dim) # [batch, 1, dim]
-		c_t = self.dotAttention(enc_states, hidden) # [batch, 1, dim]
+		c_t = self.dotAttention(enc_states, hidden) # [batch, 1, dim]d
 		outputs, hidden = self.GRUdecoder(torch.cat([embeds, c_t], dim=-1), hidden.contiguous())
 		logits = self.decoder2vocab(outputs) # [batch, 1, vocab_size]
 		return logits, hidden

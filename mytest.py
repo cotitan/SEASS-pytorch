@@ -28,7 +28,7 @@ def printSum(summaries, vocab, st, ed):
 	i2w = {key: value for value, key in vocab.items()}
 	if isinstance(summaries, list):
 		for sum in summaries:
-			tokens = [i2w[int(idx.cpu().numpy())] for idx in sum[0]]
+			tokens = [i2w[int(idx.cpu().numpy())] for idx in sum[0] if idx.cpu().numpy() != vocab["<pad>"]]
 			print(" ".join(tokens))
 
 	else:
