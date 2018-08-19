@@ -2,6 +2,7 @@
 /models/*
 /.idea/*
 /log/*
+/log/train.log
 /__pycache__/
 /*.tar.gz
 /sumdata
