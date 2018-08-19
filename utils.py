@@ -83,7 +83,7 @@ def load_data(filename, vocab, n_data=None):
 	return datas
 
 class MyDatasets(Dataset):
-	def __init__(self, filename, vocab, n_data=None, st='<s>', ed='</s>', unk='UNK'):
+	def __init__(self, filename, vocab, n_data=None):
 		self.datas = load_data(filename, vocab, n_data)
 		self._size = len(self.datas)
 	

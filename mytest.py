@@ -5,7 +5,7 @@ import torch
 import argparse
 from layers import Seq2SeqAttention
 
-parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in DyNet')
+parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in pytorch')
 
 parser.add_argument('--gpu', type=int, default='-1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_valid', type=int, default=189651,
@@ -28,7 +28,7 @@ def printSum(summaries, vocab, st, ed):
 	i2w = {key: value for value, key in vocab.items()}
 	if isinstance(summaries, list):
 		for sum in summaries:
-			tokens = [i2w[int(idx.cpu().numpy())] for idx in sum[0]]
+			tokens = [i2w[int(idx.cpu().numpy())] for idx in sum[0] if idx.cpu().numpy() != vocab["<pad>"]]
 			print(" ".join(tokens))
 
 	else:

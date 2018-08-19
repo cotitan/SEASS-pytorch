@@ -81,15 +81,13 @@ def train(trainX, trainY, validX, validY, model, optimizer, scheduler, epochs=1)
 			if (idx + 1) % 10 == 0:
 				train_loss = loss.cpu().detach().numpy()
 				valid_loss = validate(validX, validY, model)
-				# print('step %d, training loss = %f, validation loss = %f' % (steps, train_loss, valid_loss))
 				logging.info('epoch %d, step %d, training loss = %f, validation loss = %f'
 							 % (epoch, idx + 1, train_loss, valid_loss))
 
-		# torch.save(model, 'model_%d.pkl' % epoch)
 		model.cpu()
 		torch.save(model.state_dict(), os.path.join(model_dir, 'params_%d.pkl' % epoch))
-		# print('Model saved in dir %s' % model_dir)
 		logging.info('Model saved in dir %s' % model_dir)
+		model.cuda(device)
 
 
 def decode():
@@ -123,7 +121,7 @@ def main():
 	validX = utils.getDataLoader(VALID_X, vocab, n_data=N_VALID, batch_size=BATCH_SIZE)
 	validY = utils.getDataLoader(VALID_Y, vocab, n_data=N_VALID, batch_size=BATCH_SIZE)
 
-	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25)
+	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25, dropout=0.5)
 	if args.gpu != -1:
 		model = model.cuda(device)
 
@@ -131,7 +129,6 @@ def main():
 	if os.path.exists(model_file):
 		model.load_state_dict(torch.load(model_file))
 		logging.info('Load model parameters from %s' % model_file)
-		# print('Load model parameters from %s' % model_file)
 
 	optimizer = torch.optim.Adam(model.parameters(), lr=0.0003)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.3)
