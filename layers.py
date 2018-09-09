@@ -48,7 +48,7 @@ class AttentionGRUCell(nn.Module):
 
 
 class Seq2SeqAttention(nn.Module):
-	def __init__(self, vocab_size, emb_dim, hid_dim, batch_size, vocab, device, beam_size=3, max_trg_len=25, dropout=0.0):
+	def __init__(self, vocab_size, emb_dim, hid_dim, batch_size, vocab, device, beam_size=3, max_trg_len=25):
 		super(Seq2SeqAttention, self).__init__()
 		self.vocab_size = vocab_size
 		self.emb_dim = emb_dim
@@ -61,17 +61,22 @@ class Seq2SeqAttention(nn.Module):
 		self.embedding_lookup = nn.Embedding(vocab_size, emb_dim)
 
 		# encoder
-		self.biGRU = nn.GRU(emb_dim, hid_dim//2, batch_first=True, bidirectional=True, dropout=dropout)
+		self.biGRU = nn.GRU(emb_dim, hid_dim//2, batch_first=True, bidirectional=True)
 		self.linear1 = nn.Linear(hid_dim, hid_dim)
 		self.linear2 = nn.Linear(hid_dim, hid_dim)
 		self.sigmoid = nn.Sigmoid()
 
 		# decoder,
 		self.decoderCell = AttentionGRUCell(self.vocab_size, self.emb_dim, self.hid_dim)
-		self.GRUdecoder = nn.GRU(emb_dim + hid_dim, hid_dim, batch_first=True, dropout=dropout)
+		self.GRUdecoder = nn.GRU(emb_dim + hid_dim, hid_dim, batch_first=True)
 		self.dotAttention = DotAttention()
 		self.decoder2vocab = nn.Linear(hid_dim, vocab_size)
 		self.init_decoder_hidden = nn.Linear(hid_dim//2, hid_dim)
+
+		# maxout
+		self.W = nn.Linear(emb_dim, 2 *self.vocab_size)
+		self.U = nn.Linear(hid_dim, 2 *self.vocab_size)
+		self.V = nn.Linear(hid_dim, 2 *self.vocab_size)
 
 		weight_mask = torch.ones(vocab_size).cpu()
 		weight_mask[vocab['</s>']] = 0
@@ -150,13 +155,19 @@ class Seq2SeqAttention(nn.Module):
 				logits[:, i, :] = logit.squeeze()
 			return logits
 
+	def maxout(self, w, c, s):
+		r_t = self.W(w) + self.U(c) + self.V(s)
+		m_t = F.max_pool1d(r_t, kernel_size=2, stride=2)
+		m_t = m_t.unsqueeze(1)
+		return m_t
 
 	def decoderStep(self, enc_states, hidden, word):
 		embeds = self.embedding_lookup(word).view(-1, 1, self.emb_dim) # [batch, 1, dim]
-		c_t = self.dotAttention(enc_states, hidden) # [batch, 1, dim]d
+		c_t = self.dotAttention(enc_states, hidden) # [batch, 1, dim]
 		outputs, hidden = self.GRUdecoder(torch.cat([embeds, c_t], dim=-1), hidden.contiguous())
-		logits = self.decoder2vocab(outputs) # [batch, 1, vocab_size]
-		return logits, hidden
+		m_t = self.maxout(embeds, c_t, outputs)
+		logits = self.decoder2vocab(outputs)  # [batch, 1, vocab_size]
+		return m_t, hidden
 
 	def greedyDecoder(self, enc_states, hidden, test=False, sentence=None, st='<s>', ed='</s>'):
 		"""

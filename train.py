@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive
 
 parser.add_argument('--gpu', type=int, default='-1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_epochs', type=int, default=5, help='Number of epochs [default: 3]')
-parser.add_argument('--n_train', type=int, default=100000,
+parser.add_argument('--n_train', type=int, default=3803900,
 					help='Number of training data (up to 3803957 in gigaword) [default: 3803957]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
@@ -121,7 +121,7 @@ def main():
 	validX = utils.getDataLoader(VALID_X, vocab, n_data=N_VALID, batch_size=BATCH_SIZE)
 	validY = utils.getDataLoader(VALID_Y, vocab, n_data=N_VALID, batch_size=BATCH_SIZE)
 
-	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25, dropout=0.5)
+	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25)
 	if args.gpu != -1:
 		model = model.cuda(device)
 
