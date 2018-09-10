@@ -22,7 +22,7 @@ Training and evaluation for CNN/DM is available https://s3.amazonaws.com/opennmt
 
 
 ### TODO
-1. Implement maxout layer
+1. ~~Implement maxout layer~~
 2. ROUGE metric
 3. Attention calculation
 4. ~~Fix bugs on decoder~~ 
