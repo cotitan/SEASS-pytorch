@@ -1,13 +1,13 @@
 import os
 import json
-import utils
 import torch
 import argparse
+from utils import BatchManager, load_data
 from layers import Seq2SeqAttention
+from Model import Model
 
 parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in pytorch')
 
-parser.add_argument('--gpu', type=int, default='-1', help='GPU ID to use. For cpu, set -1 [default: -1]')
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
 parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
@@ -21,10 +21,13 @@ print(args)
 if not os.path.exists(args.model_file):
 	raise FileNotFoundError("model file not found")
 
-device = torch.device(("cuda:%d" % args.gpu) if args.gpu != -1 else "cpu")
-print('using device', device)
+start_tok = "<s>"
+end_tok = "</s>"
+unk_tok = "UNK"
+pad_tok = "<pad>"
 
-def printSum(summaries, vocab, st, ed):
+
+def print_summaries(summaries, vocab):
 	i2w = {key: value for value, key in vocab.items()}
 	if isinstance(summaries, list):
 		for sum in summaries:
@@ -34,26 +37,24 @@ def printSum(summaries, vocab, st, ed):
 	else:
 		sums = summaries.cpu().numpy().squeeze()
 		for i in range(sums.shape[0]):
-			line = ''
+			line = ""
 			for idx in sums[i]:
-				if idx == vocab[ed]:
-					print(line)
+				if idx == vocab[end_tok] or idx == vocab[pad_tok]:
 					break
 				else:
 					line += str(i2w[int(idx)]) + " "
-			print(line)
+			if line != "":
+				print(line)
 
 
-### test
-def mytest(validX, validY, model, st='<s>', ed='</s>'):
-
+def my_test(valid_x, valid_y, model):
 	with torch.no_grad():
-		for _, (batchX, batchY) in enumerate(zip(validX, validY)):
-			if args.gpu != -1:
-				batchX = torch.tensor(batchX, dtype = torch.long, device=device)
-				batchY = torch.tensor(batchY, dtype = torch.long, device=device)
-			summaries = model(batchX, batchY, test=True)
-			printSum(summaries, model.vocab, st, ed)
+		for _ in range(valid_x.steps):
+			batch_x = valid_x.next_batch().cuda()
+			batch_y = valid_y.next_batch().cuda()
+			summaries = model(batch_x, batch_y, test=True)
+			print_summaries(summaries, model.vocab)
+
 
 def main():
 
@@ -66,19 +67,18 @@ def main():
 	VALID_Y = 'sumdata/Giga/task1_ref0.txt'
 
 	vocab = json.load(open('sumdata/vocab.json'))
-	validX = utils.getDataLoader(VALID_X, vocab, n_data=N_VALID, batch_size=BATCH_SIZE)
-	validY = utils.getDataLoader(VALID_Y, vocab, n_data=N_VALID, batch_size=BATCH_SIZE)
+	valid_x = BatchManager(load_data(VALID_X, vocab, N_VALID), BATCH_SIZE)
+	valid_y = BatchManager(load_data(VALID_Y, vocab, N_VALID, target=True), BATCH_SIZE)
 
-	model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, device, max_trg_len=25)
-	if args.gpu != -1:
-		model = model.cuda(device)
+	# model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, max_trg_len=25).cuda()
+	model = Model(vocab, out_len=25, emb_dim=EMB_DIM, hid_dim=HID_DIM).cuda()
 
 	file = args.model_file
 	if os.path.exists(file):
 		model.load_state_dict(torch.load(file))
 		print('Load model parameters from %s' % file)
 
-	mytest(validX, validY, model)
+	my_test(valid_x, valid_y, model)
 
 
 if __name__ == '__main__':

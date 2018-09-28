@@ -6,5 +6,5 @@
 /__pycache__/
 /*.tar.gz
 /sumdata
-.pyc
+*.pyc
 *~

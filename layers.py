@@ -48,14 +48,13 @@ class AttentionGRUCell(nn.Module):
 
 
 class Seq2SeqAttention(nn.Module):
-	def __init__(self, vocab_size, emb_dim, hid_dim, batch_size, vocab, device, beam_size=3, max_trg_len=25):
+	def __init__(self, vocab_size, emb_dim, hid_dim, batch_size, vocab, beam_size=3, max_trg_len=25):
 		super(Seq2SeqAttention, self).__init__()
 		self.vocab_size = vocab_size
 		self.emb_dim = emb_dim
 		self.hid_dim = hid_dim
 		self.beam_size = beam_size
 		self.vocab = vocab
-		self.device = torch.device('cpu') if device is None else device
 		self.max_trg_len = max_trg_len
 
 		self.embedding_lookup = nn.Embedding(vocab_size, emb_dim)
@@ -83,10 +82,10 @@ class Seq2SeqAttention(nn.Module):
 		# self.loss_function = nn.CrossEntropyLoss(weight=weight_mask)
 		# self.loss_function = nn.CrossEntropyLoss(ignore_index=self.vocab['</s>'])
 		# using the above two loss function will lead to loss don't decrease, don't know why
-		self.loss_function = nn.CrossEntropyLoss()
+		self.loss_layer = nn.CrossEntropyLoss()
 
 	def init_hidden(self, batch_size):
-		return torch.zeros(2, batch_size, self.hid_dim // 2, device=self.device)
+		return torch.zeros(2, batch_size, self.hid_dim // 2).cuda()
 
 	def forward(self, src_sentence, trg_sentence, test=False):
 		enc_states, enc_hidden = self.encode(src_sentence)
@@ -125,7 +124,7 @@ class Seq2SeqAttention(nn.Module):
 		batch_size = enc_states.shape[0]
 		hidden = F.tanh(self.init_decoder_hidden(hidden[1])).view(1, batch_size, self.hid_dim)
 		if test:
-			beams = [Beam(k, self.vocab, hidden[:,i,:], self.device) for i in range(batch_size)]
+			beams = [Beam(k, self.vocab, hidden[:,i,:]).cuda() for i in range(batch_size)]
 
 			for i in range(self.max_trg_len):
 				for j in range(batch_size):
@@ -148,7 +147,7 @@ class Seq2SeqAttention(nn.Module):
 			# return sentences
 		else:
 			max_seq_len = sentence.shape[1]
-			logits = torch.zeros(batch_size, max_seq_len - 1, self.vocab_size, device=self.device)
+			logits = torch.zeros(batch_size, max_seq_len - 1, self.vocab_size).cuda()
 			for i in range(max_seq_len - 1):
 				# logit: [batch, 1, vocab_size]
 				logit, hidden = self.decoderStep(enc_states, hidden, sentence[:, i])
@@ -184,18 +183,18 @@ class Seq2SeqAttention(nn.Module):
 		# according to paper
 		hidden = F.tanh(self.init_decoder_hidden(hidden[1])).view(1, batch_size, self.hid_dim)
 		if test:
-			word = torch.ones(batch_size, dtype=torch.long, device=self.device) * self.vocab[st]
-			words = torch.zeros(batch_size, self.max_trg_len, dtype=torch.long, device=self.device)
+			word = torch.ones(batch_size, dtype=torch.long) * self.vocab[st]
+			words = torch.zeros(batch_size, self.max_trg_len, dtype=torch.long)
 			for i in range(self.max_trg_len-1):
 				logit, hidden = self.decoderStep(enc_states, hidden, word)
 				probs = F.softmax(logit, dim=-1)
 				word = torch.argmax(probs, dim=-1).squeeze()
 				words[:,i] = word
-			words[:,-1] = torch.ones(batch_size, dtype=torch.long, device=self.device) * self.vocab[ed]
+			words[:,-1] = torch.ones(batch_size, dtype=torch.long) * self.vocab[ed]
 			return words
 		else:
 			max_seq_len = sentence.shape[1]
-			logits = torch.zeros(batch_size, max_seq_len-1, self.vocab_size, device=self.device)
+			logits = torch.zeros(batch_size, max_seq_len-1, self.vocab_size)
 			for i in range(max_seq_len - 1):
 				# logit: [batch, 1, vocab_size]
 				logit, hidden = self.decoderStep(enc_states, hidden, sentence[:,i])
