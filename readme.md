@@ -3,7 +3,7 @@
 - mail: cotitan@outlook.com
 
 ### Requirments
-- torch==0.4.0
+- pytorch==0.4.0
 - numpy==1.12.1+
 - python=3.5+
 

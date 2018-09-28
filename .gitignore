@@ -1,6 +1,7 @@
 /data/*
 /models/*
 /.idea/*
+/.vscode
 /log/*
 /log/train.log
 /__pycache__/
