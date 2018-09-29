@@ -122,7 +122,7 @@ def main():
 
 	vocab_file = os.path.join(data_dir, "vocab.json")
 	if not os.path.exists(vocab_file):
-		utils.build_vocab_from_embeddings([TRAIN_X, TRAIN_Y], vocab_file)
+		utils.build_vocab([TRAIN_X, TRAIN_Y], vocab_file)
 	vocab = json.load(open(vocab_file))
 
 	train_x = BatchManager(load_data(TRAIN_X, vocab, N_TRAIN), BATCH_SIZE)
