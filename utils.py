@@ -8,7 +8,7 @@ import re
 
 st = "<s>"
 ed = "</s>"
-unk = "UNK"
+unk = "<unk>"
 pad_tok = "<pad>"
 
 
@@ -89,7 +89,7 @@ def load_embedding_vocab(embedding_path):
 
 def build_vocab_from_embeddings(embedding_path, data_file_list):
     embedding_vocab = load_embedding_vocab(embedding_path)
-    vocab = {'<s>': 0, '</s>': 1, 'UNK': 2, '<pad>': 3}
+    vocab = {'<s>': 0, '</s>': 1, '<unk>': 2, '<pad>': 3}
 
     for file in data_file_list:
         fin = open(file)
@@ -100,7 +100,7 @@ def build_vocab_from_embeddings(embedding_path, data_file_list):
     return vocab
 
 
-def load_data_with_padding(filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', unk='UNK'):
+def load_data_with_padding(filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', unk='<unk>'):
 
     fin = open(filename, "r", encoding="utf8")
     datas = []
