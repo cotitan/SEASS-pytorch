@@ -31,7 +31,7 @@ class Model(nn.Module):
         self.emb_dim = emb_dim
         self.vocab = vocab
 
-        self.embedding_look_up = nn.Embedding(len(self.vocab), self.emb_dim, padding_idx=vocab["<pad>"])
+        self.embedding_look_up = nn.Embedding(len(self.vocab), self.emb_dim)
 
         self.encoder = nn.GRU(self.emb_dim, self.hid_dim//2, batch_first=True, bidirectional=True)
         self.attention_layer = DotAttention()
@@ -61,7 +61,7 @@ class Model(nn.Module):
                 embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
                 c_t = self.attention_layer(enc_states, hidden)
                 outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
-                logit = torch.tanh(self.decoder2vocab(outputs).squeeze())
+                logit = F.tanh(self.decoder2vocab(outputs).squeeze())
                 probs = F.softmax(logit, dim=-1)
                 word = torch.argmax(probs, dim=-1)
                 words[:, i] = word

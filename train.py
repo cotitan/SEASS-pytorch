@@ -78,7 +78,8 @@ def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epoch
 			optimizer.zero_grad()
 
 			loss = run_step(train_x, train_y, model)
-			loss.backward(retain_graph=True)
+			loss.backward()  # do not use retain_graph=True
+			del loss
 			torch.nn.utils.clip_grad_value_(model.parameters(), 5)
 
 			optimizer.step()
@@ -95,6 +96,7 @@ def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epoch
 		torch.save(model.state_dict(), os.path.join(model_dir, 'params_%d.pkl' % epoch))
 		logging.info('Model saved in dir %s' % model_dir)
 		model.cuda()
+		# model.embedding_look_up.to(torch.device("cpu"))
 
 
 def main():
@@ -120,24 +122,25 @@ def main():
 
 	vocab_file = os.path.join(data_dir, "vocab.json")
 	if not os.path.exists(vocab_file):
-		utils.build_vocab([TRAIN_X, TRAIN_Y], vocab_file)
+		utils.build_vocab_from_embeddings([TRAIN_X, TRAIN_Y], vocab_file)
 	vocab = json.load(open(vocab_file))
 
 	train_x = BatchManager(load_data(TRAIN_X, vocab, N_TRAIN), BATCH_SIZE)
-	train_y = BatchManager(load_data(TRAIN_Y, vocab, N_TRAIN, target=True), BATCH_SIZE)
+	train_y = BatchManager(load_data(TRAIN_Y, vocab, N_TRAIN), BATCH_SIZE)
 
 	valid_x = BatchManager(load_data(VALID_X, vocab, N_VALID), BATCH_SIZE*2)
-	valid_y = BatchManager(load_data(VALID_Y, vocab, N_VALID, target=True), BATCH_SIZE*2)
+	valid_y = BatchManager(load_data(VALID_Y, vocab, N_VALID), BATCH_SIZE*2)
 
 	# model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, max_trg_len=25).cuda()
 	model = Model(vocab, out_len=25, emb_dim=EMB_DIM, hid_dim=HID_DIM).cuda()
+	# model.embedding_look_up.to(torch.device("cpu"))
 
 	model_file = args.model_file
 	if os.path.exists(model_file):
 		model.load_state_dict(torch.load(model_file))
 		logging.info('Load model parameters from %s' % model_file)
 
-	optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+	optimizer = torch.optim.Adam(model.parameters(), lr=0.0003)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.3)
 
 	train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, N_EPOCHS)
