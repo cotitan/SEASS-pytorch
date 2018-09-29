@@ -1,0 +1,11 @@
+2018-09-29 14:13:07,421 - INFO - Start to train...
+2018-09-29 14:13:14,186 - INFO - epoch 0, step 10, training loss = 8.493376, validation loss = 6.552215
+2018-09-29 14:13:17,349 - INFO - epoch 0, step 20, training loss = 6.297647, validation loss = 6.870417
+2018-09-29 14:13:20,567 - INFO - epoch 0, step 30, training loss = 6.111580, validation loss = 5.817605
+2018-09-29 14:13:23,742 - INFO - epoch 0, step 40, training loss = 5.951811, validation loss = 5.365662
+2018-09-29 14:13:26,861 - INFO - epoch 0, step 50, training loss = 6.056971, validation loss = 5.254724
+2018-09-29 14:13:30,081 - INFO - epoch 0, step 60, training loss = 5.524304, validation loss = 5.152699
+2018-09-29 14:13:33,325 - INFO - epoch 0, step 70, training loss = 4.394174, validation loss = 5.073800
+2018-09-29 14:13:36,546 - INFO - epoch 0, step 80, training loss = 5.568601, validation loss = 4.847965
+2018-09-29 14:13:39,908 - INFO - epoch 0, step 90, training loss = 4.957511, validation loss = 5.206918
+2018-09-29 14:13:43,218 - INFO - epoch 0, step 100, training loss = 4.479988, validation loss = 4.616005
