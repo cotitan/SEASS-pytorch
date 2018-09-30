@@ -67,6 +67,7 @@ def run_step(valid_x, valid_y, model):
 	batch_y = valid_y.next_batch().cuda()
 	logits = model(batch_x, batch_y)
 	loss = calc_loss(logits, batch_y[:,1:], model) # exclude start token
+	del logits
 	return loss
 
 
