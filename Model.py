@@ -76,3 +76,10 @@ class Model(nn.Module):
                 logits[:, i, :] = self.decoder2vocab(outputs).squeeze()
         return logits
 
+    def my_loss_layer(self, logits, batch_y):
+        logits = torch.argmax(logits, -1)
+        logits_emb = torch.sum(self.embedding_look_up(logits), dim=1).view(-1, 1, self.emb_dim)
+        y_emb = torch.sum(self.embedding_look_up(batch_y), dim=1).view(-1, self.emb_dim, 1)
+        loss = torch.exp(-torch.sum(torch.bmm(logits_emb, y_emb)))
+        return loss
+
