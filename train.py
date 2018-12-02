@@ -67,7 +67,6 @@ def run_step(valid_x, valid_y, model):
 	batch_y = valid_y.next_batch().cuda()
 	logits = model(batch_x, batch_y)
 	loss = calc_loss(logits, batch_y[:,1:], model) # exclude start token
-	del logits
 	return loss
 
 
@@ -141,7 +140,7 @@ def main():
 		model.load_state_dict(torch.load(model_file))
 		logging.info('Load model parameters from %s' % model_file)
 
-	optimizer = torch.optim.Adam(model.parameters(), lr=0.0003)
+	optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.3)
 
 	train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, N_EPOCHS)

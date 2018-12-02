@@ -9,6 +9,7 @@ class DotAttention(nn.Module):
     """
     def __init__(self):
         super(DotAttention, self).__init__()
+        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, enc_states, h_prev):
         """
@@ -18,7 +19,7 @@ class DotAttention(nn.Module):
         :return: c_t: context vector
         """
         alpha_t = torch.bmm(h_prev.transpose(0, 1), enc_states.transpose(1, 2))  # [batch, 1, seq_len]
-        alpha_t = F.softmax(alpha_t, dim=-1)
+        alpha_t = self.softmax(alpha_t)
         c_t = torch.bmm(alpha_t, enc_states)  # [batch, 1, dim]
         return c_t
 
@@ -31,6 +32,9 @@ class Model(nn.Module):
         self.emb_dim = emb_dim
         self.vocab = vocab
 
+        self.softmax = nn.Softmax(dim=-1)
+        self.tanh = nn.Tanh()
+
         self.embedding_look_up = nn.Embedding(len(self.vocab), self.emb_dim)
 
         self.encoder = nn.GRU(self.emb_dim, self.hid_dim//2, batch_first=True, bidirectional=True)
@@ -40,14 +44,15 @@ class Model(nn.Module):
         self.decoder2vocab = nn.Linear(self.hid_dim, len(self.vocab))
 
         self.loss_layer = nn.CrossEntropyLoss()
+        self.hidden = None
 
     def init_hidden(self, batch_size):
         return torch.zeros(2, batch_size, self.hid_dim//2).cuda()
 
     def forward(self, inputs, targets, test=False):
         embeds = self.embedding_look_up(inputs)
-        hidden = self.init_hidden(len(inputs))
-        states, hidden = self.encoder(embeds, hidden)
+        self.hidden = self.init_hidden(len(inputs))
+        states, hidden = self.encoder(embeds, self.hidden)
         # logits = self.decode(hidden, targets, test)
         logits = self.attention_decode(states, hidden, targets, test)
         return logits
@@ -61,8 +66,8 @@ class Model(nn.Module):
                 embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
                 c_t = self.attention_layer(enc_states, hidden)
                 outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
-                logit = F.tanh(self.decoder2vocab(outputs).squeeze())
-                probs = F.softmax(logit, dim=-1)
+                logit = self.tanh(self.decoder2vocab(outputs).squeeze())
+                probs = self.softmax(logit)
                 word = torch.argmax(probs, dim=-1)
                 words[:, i] = word
             return words
@@ -82,4 +87,3 @@ class Model(nn.Module):
         y_emb = torch.sum(self.embedding_look_up(batch_y), dim=1).view(-1, self.emb_dim, 1)
         loss = torch.exp(-torch.sum(torch.bmm(logits_emb, y_emb)))
         return loss
-

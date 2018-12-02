@@ -67,9 +67,9 @@ def build_vocab(filelist=['sumdata/train/train.article.txt', 'sumdata/train/trai
         fin.close()
     print('Number of all words: %d' % len(freq))
     
-    vocab = {st: 0, ed: 1, unk: 2, pad_tok: 3}
-    if unk in freq:
-        freq.pop(unk)
+    vocab = {'<s>': 0, '</s>': 1, 'UNK': 2, '<pad>': 3}
+    if 'UNK' in freq:
+        freq.pop('UNK')
     for word in freq:
         if freq[word] > min_count:
             vocab[word] = len(vocab)
@@ -89,7 +89,7 @@ def load_embedding_vocab(embedding_path):
 
 def build_vocab_from_embeddings(embedding_path, data_file_list):
     embedding_vocab = load_embedding_vocab(embedding_path)
-    vocab = {st: 0, ed: 1, unk: 2, pad_tok: 3}
+    vocab = {'<s>': 0, '</s>': 1, '<unk>': 2, '<pad>': 3}
 
     for file in data_file_list:
         fin = open(file)
@@ -100,7 +100,7 @@ def build_vocab_from_embeddings(embedding_path, data_file_list):
     return vocab
 
 
-def load_data_with_padding(filename, vocab, max_len=100, n_data=None):
+def load_data_with_padding(filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', unk='<unk>'):
 
     fin = open(filename, "r", encoding="utf8")
     datas = []
@@ -127,7 +127,7 @@ def load_data(filename, vocab, n_data=None, target=False):
             break
         words = line.strip().split()
         if target:
-            words = [st] + words + [ed]
+            words = ['<s>'] + words + ['</s>']
         sample = [vocab[w if w in vocab else unk] for w in words]
         datas.append(sample)
     return datas
