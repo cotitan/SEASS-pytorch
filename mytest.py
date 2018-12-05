@@ -10,6 +10,8 @@ parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive
 
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
+parser.add_argument('--valid_x', type=str, default="sumdata/Giga/input.txt", help='input file')
+parser.add_argument('--valid_y', type=str, default="sumdata/Giga/task1_ref0.txt", help='input file')
 parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
 parser.add_argument('--emb_dim', type=int, default=300, help='Embedding size [default: 256]')
 parser.add_argument('--hid_dim', type=int, default=512, help='Hidden state size [default: 256]')
@@ -63,12 +65,9 @@ def main():
 	EMB_DIM = args.emb_dim
 	HID_DIM = args.hid_dim
 
-	VALID_X = 'sumdata/Giga/input.txt'
-	VALID_Y = 'sumdata/Giga/task1_ref0.txt'
-
 	vocab = json.load(open('sumdata/vocab.json'))
-	valid_x = BatchManager(load_data(VALID_X, vocab, N_VALID), BATCH_SIZE)
-	valid_y = BatchManager(load_data(VALID_Y, vocab, N_VALID, target=True), BATCH_SIZE)
+	valid_x = BatchManager(load_data(args.valid_x, vocab, N_VALID), BATCH_SIZE)
+	valid_y = BatchManager(load_data(args.valid_y, vocab, N_VALID, target=True), BATCH_SIZE)
 
 	# model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, max_trg_len=25).cuda()
 	model = Model(vocab, out_len=25, emb_dim=EMB_DIM, hid_dim=HID_DIM).cuda()

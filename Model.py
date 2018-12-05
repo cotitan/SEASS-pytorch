@@ -43,15 +43,16 @@ class Model(nn.Module):
 
         self.decoder2vocab = nn.Linear(self.hid_dim, len(self.vocab))
 
+        # self.loss_layer = nn.CrossEntropyLoss(ignore_index=self.vocab['<pad>'])
         self.loss_layer = nn.CrossEntropyLoss()
-        self.hidden = None
+        self.hidden = self.init_hidden(64)
 
     def init_hidden(self, batch_size):
         return torch.zeros(2, batch_size, self.hid_dim//2).cuda()
 
     def forward(self, inputs, targets, test=False):
         embeds = self.embedding_look_up(inputs)
-        self.hidden = self.init_hidden(len(inputs))
+        # self.hidden = self.init_hidden(len(inputs))
         states, hidden = self.encoder(embeds, self.hidden)
         # logits = self.decode(hidden, targets, test)
         logits = self.attention_decode(states, hidden, targets, test)
@@ -60,7 +61,7 @@ class Model(nn.Module):
     def attention_decode(self, enc_states, hidden, targets, test=False):
         hidden = torch.cat([hidden[0], hidden[1]], dim=-1).view(1, -1, self.hid_dim)
         if test:
-            words = torch.zeros(hidden.shape[1], self.out_len, dtype=torch.long)
+            words = torch.ones(hidden.shape[1], self.out_len, dtype=torch.long)
             word = torch.ones(hidden.shape[1], dtype=torch.long).cuda() * self.vocab["<s>"]
             for i in range(self.out_len):
                 embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
@@ -72,14 +73,14 @@ class Model(nn.Module):
                 words[:, i] = word
             return words
         else:
-            logits = torch.zeros(hidden.shape[1], targets.shape[1]-1, len(self.vocab)).cuda()
+            self.logits = torch.zeros(hidden.shape[1], targets.shape[1]-1, len(self.vocab)).cuda()
             for i in range(targets.shape[1] - 1):
                 word = targets[:, i]
                 embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
                 c_t = self.attention_layer(enc_states, hidden)
                 outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
-                logits[:, i, :] = self.decoder2vocab(outputs).squeeze()
-        return logits
+                self.logits[:, i, :] = self.decoder2vocab(outputs).squeeze()
+        return self.logits
 
     def my_loss_layer(self, logits, batch_y):
         logits = torch.argmax(logits, -1)

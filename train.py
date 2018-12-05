@@ -128,8 +128,8 @@ def main():
 	train_x = BatchManager(load_data(TRAIN_X, vocab, N_TRAIN), BATCH_SIZE)
 	train_y = BatchManager(load_data(TRAIN_Y, vocab, N_TRAIN), BATCH_SIZE)
 
-	valid_x = BatchManager(load_data(VALID_X, vocab, N_VALID), BATCH_SIZE*2)
-	valid_y = BatchManager(load_data(VALID_Y, vocab, N_VALID), BATCH_SIZE*2)
+	valid_x = BatchManager(load_data(VALID_X, vocab, N_VALID), BATCH_SIZE)
+	valid_y = BatchManager(load_data(VALID_Y, vocab, N_VALID), BATCH_SIZE)
 
 	# model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, max_trg_len=25).cuda()
 	model = Model(vocab, out_len=25, emb_dim=EMB_DIM, hid_dim=HID_DIM).cuda()
@@ -140,7 +140,7 @@ def main():
 		model.load_state_dict(torch.load(model_file))
 		logging.info('Load model parameters from %s' % model_file)
 
-	optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+	optimizer = torch.optim.Adam(model.parameters(), lr=0.0003)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20000, gamma=0.3)
 
 	train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, N_EPOCHS)

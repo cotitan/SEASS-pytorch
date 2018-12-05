@@ -20,19 +20,25 @@ def collate_fn(batch_data, pad_value):
     # packed = pack_padded_sequence(padded, lens, batch_first=True)
     return padded
 
+def my_pad_sequence(batch, pad_value):
+    max_len = max([len(b) for b in batch])
+    batch = [b + [pad_value] * (max_len - len(b)) for b in batch]
+    return torch.tensor(batch)
 
 class BatchManager:
     def __init__(self, datas, batch_size):
         self.steps = int(len(datas) / batch_size)
-        if self.steps * batch_size < len(datas):
-            self.steps += 1
+        # comment following two lines to neglect the last batch
+        # if self.steps * batch_size < len(datas):
+        #    self.steps += 1
         self.datas = datas
         self.bs = batch_size
         self.bid = 0
 
     def next_batch(self):
         batch = list(self.datas[self.bid * self.bs: (self.bid + 1) * self.bs])
-        batch = collate_fn(batch, pad_value=3)
+        # batch = collate_fn(batch, pad_value=3)
+        batch = my_pad_sequence(batch, 3)
         self.bid += 1
         if self.bid == self.steps:
             self.bid = 0
@@ -126,8 +132,8 @@ def load_data(filename, vocab, n_data=None, target=False):
         if idx == n_data or line == '':
             break
         words = line.strip().split()
-        if target:
-            words = ['<s>'] + words + ['</s>']
+        # if target:
+        words = ['<s>'] + words + ['</s>']
         sample = [vocab[w if w in vocab else unk] for w in words]
         datas.append(sample)
     return datas
