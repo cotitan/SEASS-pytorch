@@ -37,7 +37,12 @@ class Model(nn.Module):
 
         self.embedding_look_up = nn.Embedding(len(self.vocab), self.emb_dim)
 
+        # encoder (with selective gate)
         self.encoder = nn.GRU(self.emb_dim, self.hid_dim//2, batch_first=True, bidirectional=True)
+        self.linear1 = nn.Linear(hid_dim, hid_dim)
+        self.linear2 = nn.Linear(hid_dim, hid_dim)
+        self.sigmoid = nn.Sigmoid()
+
         self.attention_layer = DotAttention()
         self.decoder = nn.GRU(self.emb_dim + self.hid_dim, self.hid_dim, batch_first=True)
 
@@ -45,18 +50,24 @@ class Model(nn.Module):
 
         self.loss_layer = nn.CrossEntropyLoss(ignore_index=self.vocab['<pad>'])
         # self.loss_layer = nn.CrossEntropyLoss()
-        self.hidden = self.init_hidden(64)
+        self.hidden = None
 
     def init_hidden(self, batch_size):
-        return torch.zeros(2, batch_size, self.hid_dim//2).cuda()
+        self.hidden = torch.zeros(2, batch_size, self.hid_dim//2).cuda()
 
     def forward(self, inputs, targets, test=False):
-        embeds = self.embedding_look_up(inputs)
-        # self.hidden = self.init_hidden(len(inputs))
-        states, hidden = self.encoder(embeds, self.hidden)
-        # logits = self.decode(hidden, targets, test)
-        logits = self.attention_decode(states, hidden, targets, test)
+        outputs, hidden = self.encode(inputs)
+        logits = self.attention_decode(outputs, hidden, targets, test)
         return logits
+
+    def encode(self, inputs):
+        embeds = self.embedding_look_up(inputs)
+        outputs, hidden = self.encoder(embeds, self.hidden)
+        sn = torch.cat([hidden[0], hidden[1]], dim=-1).view(-1, 1, self.hid_dim)
+        # [batch, seq_len, hid_dim] + [batch, 1, hid_dim] = [batch, seq_len, hid_dim]
+        sGate = self.sigmoid(self.linear1(outputs) + self.linear2(sn))
+        outputs = outputs * sGate
+        return outputs, hidden
 
     def attention_decode(self, enc_states, hidden, targets, test=False):
         hidden = torch.cat([hidden[0], hidden[1]], dim=-1).view(1, -1, self.hid_dim)
@@ -81,10 +92,3 @@ class Model(nn.Module):
                 outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
                 self.logits[:, i, :] = self.decoder2vocab(outputs).squeeze()
         return self.logits
-
-    def my_loss_layer(self, logits, batch_y):
-        logits = torch.argmax(logits, -1)
-        logits_emb = torch.sum(self.embedding_look_up(logits), dim=1).view(-1, 1, self.emb_dim)
-        y_emb = torch.sum(self.embedding_look_up(batch_y), dim=1).view(-1, self.emb_dim, 1)
-        loss = torch.exp(-torch.sum(torch.bmm(logits_emb, y_emb)))
-        return loss

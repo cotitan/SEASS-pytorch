@@ -73,6 +73,8 @@ def run_step(valid_x, valid_y, model):
 def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epochs=1):
 	logging.info("Start to train...")
 	n_batches = train_x.steps
+	# init encoder hidden is necessary
+	model.init_hidden(batch_size=train_x.batch_size)
 	for epoch in range(epochs):
 		for idx in range(n_batches):
 			optimizer.zero_grad()

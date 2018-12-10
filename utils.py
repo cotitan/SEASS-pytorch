@@ -32,11 +32,11 @@ class BatchManager:
         # if self.steps * batch_size < len(datas):
         #    self.steps += 1
         self.datas = datas
-        self.bs = batch_size
+        self.batch_size = batch_size
         self.bid = 0
 
     def next_batch(self):
-        batch = list(self.datas[self.bid * self.bs: (self.bid + 1) * self.bs])
+        batch = list(self.datas[self.bid * self.batch_size: (self.bid + 1) * self.batch_size])
         # batch = collate_fn(batch, pad_value=3)
         batch = my_pad_sequence(batch, 3)
         self.bid += 1
