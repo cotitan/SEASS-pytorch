@@ -84,7 +84,7 @@ def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epoch
 			optimizer.step()
 			# scheduler.step()
 
-			if (idx + 1) % 10 == 0:
+			if (idx + 1) % 50 == 0:
 				train_loss = loss.cpu().detach().numpy()
 				with torch.no_grad():
 					valid_loss = run_step(valid_x, valid_y, model)

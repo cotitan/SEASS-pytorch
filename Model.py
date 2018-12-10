@@ -43,8 +43,8 @@ class Model(nn.Module):
 
         self.decoder2vocab = nn.Linear(self.hid_dim, len(self.vocab))
 
-        # self.loss_layer = nn.CrossEntropyLoss(ignore_index=self.vocab['<pad>'])
-        self.loss_layer = nn.CrossEntropyLoss()
+        self.loss_layer = nn.CrossEntropyLoss(ignore_index=self.vocab['<pad>'])
+        # self.loss_layer = nn.CrossEntropyLoss()
         self.hidden = self.init_hidden(64)
 
     def init_hidden(self, batch_size):
