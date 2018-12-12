@@ -4,21 +4,12 @@ from collections import defaultdict
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 import torch
-import re
+import threading
 
 st = "<s>"
 ed = "</s>"
 unk = "<unk>"
 pad_tok = "<pad>"
-
-
-def collate_fn(batch_data, pad_value):
-    batch_data.sort(key=lambda x: len(x), reverse=True)
-    batch_data = [torch.tensor(x) for x in batch_data]
-    lens = [len(x) for x in batch_data]
-    padded = pad_sequence(batch_data, batch_first=True, padding_value=pad_value)
-    # packed = pack_padded_sequence(padded, lens, batch_first=True)
-    return padded
 
 def my_pad_sequence(batch, pad_value):
     max_len = max([len(b) for b in batch])
@@ -34,14 +25,32 @@ class BatchManager:
         self.datas = datas
         self.batch_size = batch_size
         self.bid = 0
+        self.buffer = []
+        self.s1 = threading.Semaphore(1)
+        self.t1 = threading.Thread(target=self.loader, args=())
+        self.t1.start()
+
+    def loader(self):
+        while True:
+            # generate next batch only when buffer is empty()
+            self.s1.acquire()
+            batch = list(self.datas[self.bid * self.batch_size: (self.bid + 1) * self.batch_size])
+            # batch = collate_fn(batch, pad_value=3)
+            batch = my_pad_sequence(batch, 3)
+            self.bid += 1
+            if self.bid == self.steps:
+                self.bid = 0
+            self.buffer.append(batch)
 
     def next_batch(self):
-        batch = list(self.datas[self.bid * self.batch_size: (self.bid + 1) * self.batch_size])
-        # batch = collate_fn(batch, pad_value=3)
-        batch = my_pad_sequence(batch, 3)
-        self.bid += 1
-        if self.bid == self.steps:
-            self.bid = 0
+        # batch = list(self.datas[self.bid * self.batch_size: (self.bid + 1) * self.batch_size])
+        # # batch = collate_fn(batch, pad_value=3)
+        # batch = my_pad_sequence(batch, 3)
+        # self.bid += 1
+        # if self.bid == self.steps:
+        #     self.bid = 0
+        batch = self.buffer.pop()
+        self.s1.release()
         return batch
 
 
@@ -52,7 +61,6 @@ class myCollate:
     def collate_fn(self, batch_data):
         batch_data.sort(key=lambda x: len(x), reverse=True)
         batch_data = [torch.tensor(x) for x in batch_data]
-        lens = [len(x) for x in batch_data]
         padded = pad_sequence(batch_data, batch_first=True, padding_value=self.pad_value)
         # packed = pack_padded_sequence(padded, lens, batch_first=True)
         return padded
