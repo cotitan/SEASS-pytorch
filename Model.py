@@ -92,3 +92,4 @@ class Model(nn.Module):
                 outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
                 self.logits[:, i, :] = self.decoder2vocab(outputs).squeeze()
         return self.logits
+
