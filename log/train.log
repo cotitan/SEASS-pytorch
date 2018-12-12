@@ -1,3 +1,0 @@
-2018-12-12 16:58:31,504 - INFO - Load model parameters from models/params_1.pkl
-2018-12-12 16:58:31,504 - INFO - Start to train...
-2018-12-12 16:59:29,950 - INFO - epoch 0, step 50, training loss = 3.373886, validation loss = 2.981034
