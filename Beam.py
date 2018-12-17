@@ -19,7 +19,7 @@ import torch
 class Beam(object):
     """Ordered beam of candidate outputs."""
 
-    def __init__(self, size, vocab, hidden, device):
+    def __init__(self, size, vocab, hidden, device=torch.device("cuda:0")):
         """Initialize params."""
         self.size = size
         self.done = False

@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from Beam import Beam
 
 
 class DotAttention(nn.Module):
@@ -58,6 +59,7 @@ class Model(nn.Module):
     def forward(self, inputs, targets, test=False):
         outputs, hidden = self.encode(inputs)
         logits = self.attention_decode(outputs, hidden, targets, test)
+        # logits = self.beamSearchDecoder(outputs, hidden, targets, test)  # does not work yet
         return logits
 
     def encode(self, inputs):
@@ -69,14 +71,14 @@ class Model(nn.Module):
         outputs = outputs * sGate
         return outputs, hidden
 
-    def attention_decode(self, enc_states, hidden, targets, test=False):
+    def attention_decode(self, enc_outs, hidden, targets, test=False):
         hidden = torch.cat([hidden[0], hidden[1]], dim=-1).view(1, -1, self.hid_dim)
         if test:
             words = torch.ones(hidden.shape[1], self.out_len, dtype=torch.long)
             word = torch.ones(hidden.shape[1], dtype=torch.long).cuda() * self.vocab["<s>"]
             for i in range(self.out_len):
                 embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
-                c_t = self.attention_layer(enc_states, hidden)
+                c_t = self.attention_layer(enc_outs, hidden)
                 outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
                 logit = self.tanh(self.decoder2vocab(outputs).squeeze())
                 probs = self.softmax(logit)
@@ -84,12 +86,60 @@ class Model(nn.Module):
                 words[:, i] = word
             return words
         else:
-            self.logits = torch.zeros(hidden.shape[1], targets.shape[1]-1, len(self.vocab)).cuda()
+            logits = torch.zeros(hidden.shape[1], targets.shape[1]-1, len(self.vocab)).cuda()
             for i in range(targets.shape[1] - 1):
                 word = targets[:, i]
                 embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
-                c_t = self.attention_layer(enc_states, hidden)
+                c_t = self.attention_layer(enc_outs, hidden)
                 outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
-                self.logits[:, i, :] = self.decoder2vocab(outputs).squeeze()
-        return self.logits
+                logits[:, i, :] = self.decoder2vocab(outputs).squeeze()
+        return logits
 
+    def beamSearchDecoder(self, enc_outs, hidden, targets, test=False, k=3):
+        """
+        Decoder with beam search
+        :param enc_states:
+        :param hidden:
+        :param test:
+        :param sentence:
+        :param k:
+        :return:
+        """
+        batch_size = enc_outs.shape[0]
+        hidden = torch.cat([hidden[0], hidden[1]], dim=-1).view(1, -1, self.hid_dim)
+        if test:
+            beams = [Beam(k, self.vocab, hidden[:,i,:]) for i in range(batch_size)]
+
+            for i in range(self.out_len):
+                for j in range(batch_size):
+                    word = beams[j].get_current_word()
+                    embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
+                    hidden = beams[j].get_hidden_state()
+                    c_t = self.attention_layer(enc_outs[j].view(1, -1, self.hid_dim).expand(k, -1, -1), hidden)
+                    logits, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden.contiguous())
+
+                    # logits, hidden = self.decoderStep(enc_outs[j].view(1, -1, self.hid_dim).expand(k, -1, -1),
+                    #                                   beams[j].get_hidden_state(),
+                    #                                   beams[j].get_current_word())
+                    logLikelihood = torch.log(F.softmax(logits, dim=-1))
+                    beams[j].advance(logLikelihood, hidden)
+
+            allHyp, allScores = [], []
+            n_best = 1
+            for b in range(batch_size):
+                scores, ks = beams[b].sort_best()
+
+                allScores += [scores[:n_best]]
+                hyps = [beams[b].get_hyp(k) for k in ks[:n_best]]
+                allHyp.append(hyps)
+
+            return allHyp
+            # return sentences
+        else:
+            logits = torch.zeros(hidden.shape[1], targets.shape[1]-1, len(self.vocab)).cuda()
+            for i in range(targets.shape[1] - 1):
+                word = targets[:, i]
+                embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
+                c_t = self.attention_layer(enc_outs, hidden)
+                outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
+                logits[:, i, :] = self.decoder2vocab(outputs).squeeze()
