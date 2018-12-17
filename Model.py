@@ -80,7 +80,8 @@ class Model(nn.Module):
                 embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
                 c_t = self.attention_layer(enc_outs, hidden)
                 outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
-                logit = self.tanh(self.decoder2vocab(outputs).squeeze())
+                # logit = self.tanh(self.decoder2vocab(outputs).squeeze())
+                logit = self.decoder2vocab(outputs).squeeze()
                 probs = self.softmax(logit)
                 word = torch.argmax(probs, dim=-1)
                 words[:, i] = word
