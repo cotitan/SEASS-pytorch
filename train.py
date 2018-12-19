@@ -66,15 +66,18 @@ def run_step(valid_x, valid_y, model):
 	batch_x = valid_x.next_batch().cuda()
 	batch_y = valid_y.next_batch().cuda()
 	logits = model(batch_x, batch_y)
-	loss = calc_loss(logits, batch_y[:,1:], model) # exclude start token
+	loss = 0
+	for i in range(len(logits)):
+		# loss += calc_loss(logits, batch_y[:,i+1:], model)
+		# logits[i]: batch * V
+		loss += model.loss_layer(logits[i], batch_y[:, i+1]) # i+1 to exclude start token
+	loss /= len(logits)
 	return loss
 
 
 def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epochs=1):
 	logging.info("Start to train...")
 	n_batches = train_x.steps
-	# init encoder hidden is necessary
-	model.init_hidden(batch_size=train_x.batch_size)
 	for epoch in range(epochs):
 		for idx in range(n_batches):
 			optimizer.zero_grad()

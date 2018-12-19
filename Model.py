@@ -48,18 +48,13 @@ class Model(nn.Module):
         self.decoder = nn.GRU(self.emb_dim + self.hid_dim, self.hid_dim, batch_first=True)
 
         # maxout
-        self.W = nn.Linear(emb_dim, 2 * len(self.vocab))
-        self.U = nn.Linear(hid_dim, 2 * len(self.vocab))
-        self.V = nn.Linear(hid_dim, 2 * len(self.vocab))
+        self.W = nn.Linear(emb_dim, 2 * hid_dim)
+        self.U = nn.Linear(hid_dim, 2 * hid_dim)
+        self.V = nn.Linear(hid_dim, 2 * hid_dim)
 
         self.decoder2vocab = nn.Linear(self.hid_dim, len(self.vocab))
 
         self.loss_layer = nn.CrossEntropyLoss(ignore_index=self.vocab['<pad>'])
-        # self.loss_layer = nn.CrossEntropyLoss()
-        self.hidden = None
-
-    def init_hidden(self, batch_size):
-        self.hidden = torch.zeros(2, batch_size, self.hid_dim//2).cuda()
 
     def forward(self, inputs, targets, test=False):
         outputs, hidden = self.encode(inputs)
@@ -69,7 +64,7 @@ class Model(nn.Module):
 
     def encode(self, inputs):
         embeds = self.embedding_look_up(inputs)
-        outputs, hidden = self.encoder(embeds, self.hidden)
+        outputs, hidden = self.encoder(embeds)  # h_0 defaults to zero if not provided
         sn = torch.cat([hidden[0], hidden[1]], dim=-1).view(-1, 1, self.hid_dim)
         # [batch, seq_len, hid_dim] + [batch, 1, hid_dim] = [batch, seq_len, hid_dim]
         sGate = self.sigmoid(self.linear1(outputs) + self.linear2(sn))
@@ -85,25 +80,26 @@ class Model(nn.Module):
         embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
         c_t = self.attention_layer(enc_outs, hidden)
         outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
-        # logit = self.decoder2vocab(outputs).squeeze()
-        logit = self.maxout(embeds, c_t, hidden).squeeze()
+        outputs = self.maxout(embeds, c_t, hidden).squeeze()  # comment this line to remove maxout
+        logit = self.decoder2vocab(outputs).squeeze()
         return logit, hidden
 
     def greedy_decoder(self, enc_outs, hidden, targets, test=False):
         hidden = torch.cat([hidden[0], hidden[1]], dim=-1).view(1, -1, self.hid_dim)
         if test:
-            words = torch.ones(hidden.shape[1], self.out_len, dtype=torch.long)
+            words = []
             word = torch.ones(hidden.shape[1], dtype=torch.long).cuda() * self.vocab["<s>"]
             for i in range(self.out_len):
                 logit, hidden = self.decoder_step(word, enc_outs, hidden)
                 word = torch.argmax(logit, dim=-1)
-                words[:, i] = word
+                words.append(word.cpu().numpy())
             return words
         else:
-            logits = torch.zeros(hidden.shape[1], targets.shape[1]-1, len(self.vocab)).cuda()
+            logits = []
             for i in range(targets.shape[1] - 1):
                 word = targets[:, i]
-                logits[:, i, :], hidden = self.decoder_step(word, enc_outs, hidden)
+                logit, hidden = self.decoder_step(word, enc_outs, hidden)
+                logits.append(logit)
         return logits
 
     def beamSearchDecoder(self, enc_outs, hidden, targets, test=False, k=3):

@@ -20,8 +20,8 @@ class BatchManager:
     def __init__(self, datas, batch_size):
         self.steps = int(len(datas) / batch_size)
         # comment following two lines to neglect the last batch
-        # if self.steps * batch_size < len(datas):
-        #    self.steps += 1
+        if self.steps * batch_size < len(datas):
+           self.steps += 1
         self.datas = datas
         self.batch_size = batch_size
         self.bid = 0
