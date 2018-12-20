@@ -12,16 +12,37 @@ class DotAttention(nn.Module):
         super(DotAttention, self).__init__()
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, enc_states, h_prev):
+    def forward(self, enc_outs, s_prev):
         """
         calculate the context vector c_t, both the input and output are batch first
-        :param enc_states: the encoder states, in shape [batch, seq_len, dim]
-        :param h_prev: the previous states of decoder, h_{t-1}, in shape [1, batch, dim]
+        :param enc_outs: the encoder states, in shape [batch, seq_len, dim]
+        :param s_prev: the previous states of decoder, h_{t-1}, in shape [1, batch, dim]
         :return: c_t: context vector
         """
-        alpha_t = torch.bmm(h_prev.transpose(0, 1), enc_states.transpose(1, 2))  # [batch, 1, seq_len]
+        alpha_t = torch.bmm(s_prev.transpose(0, 1), enc_outs.transpose(1, 2))  # [batch, 1, seq_len]
         alpha_t = self.softmax(alpha_t)
-        c_t = torch.bmm(alpha_t, enc_states)  # [batch, 1, dim]
+        c_t = torch.bmm(alpha_t, enc_outs)  # [batch, 1, dim]
+        return c_t
+
+
+class BahdanauAttention(nn.Module):
+    def __init__(self, enc_dim, dec_dim):
+        super(BahdanauAttention, self).__init__()
+        self.W_U = nn.Linear((enc_dim + dec_dim), dec_dim)
+        self.V = nn.Linear(dec_dim, 1)
+
+    def forward(self, enc_outs, s_prev):
+        """
+        calculate the context vector c_t, both the input and output are batch first
+        :param enc_outs: the encoder states, in shape [batch, seq_len, dim]
+        :param s_prev: the previous states of decoder, h_{t-1}, in shape [1, batch, dim]
+        :return: c_t: context vector
+        """
+        s_expanded = s_prev.transpose(0,1).expand(-1, enc_outs.shape[1], -1)
+        cat = torch.cat([enc_outs, s_expanded], dim=-1)
+        alpha_t = self.V(torch.tanh(self.W_U(cat))).transpose(1, 2) # [batch, 1, seq_len]
+        e_t = F.softmax(alpha_t, dim=-1)
+        c_t = torch.bmm(e_t, enc_outs)  # [batch, 1, dim]
         return c_t
 
 
@@ -34,7 +55,6 @@ class Model(nn.Module):
         self.vocab = vocab
 
         self.softmax = nn.Softmax(dim=-1)
-        self.tanh = nn.Tanh()
 
         self.embedding_look_up = nn.Embedding(len(self.vocab), self.emb_dim)
 
@@ -44,7 +64,8 @@ class Model(nn.Module):
         self.linear2 = nn.Linear(hid_dim, hid_dim)
         self.sigmoid = nn.Sigmoid()
 
-        self.attention_layer = DotAttention()
+        # self.attention_layer = DotAttention()
+        self.attention_layer = BahdanauAttention(self.hid_dim, self.hid_dim)
         self.decoder = nn.GRU(self.emb_dim + self.hid_dim, self.hid_dim, batch_first=True)
 
         # maxout
@@ -105,7 +126,7 @@ class Model(nn.Module):
     def beamSearchDecoder(self, enc_outs, hidden, targets, test=False, k=3):
         """
         Decoder with beam search
-        :param enc_states:
+        :param enc_outs:
         :param hidden:
         :param test:
         :param sentence:

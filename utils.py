@@ -6,10 +6,16 @@ from torch.nn.utils.rnn import pad_sequence
 import torch
 import threading
 
-st = "<s>"
-ed = "</s>"
-unk = "<unk>"
+start_tok = "<s>"
+end_tok = "</s>"
+unk_tok = "<unk>"
 pad_tok = "<pad>"
+""" Caution:
+In training data, unk_tok='<unk>', but in test data, unk_tok='UNK'.
+This is reasonable, because if the unk_tok you predict is the same as the
+unk_tok in the test data, then your prediction would be regard as correct,
+but since unk_tok is unknown, it's impossible to give a correct prediction
+"""
 
 def my_pad_sequence(batch, pad_value):
     max_len = max([len(b) for b in batch])
@@ -81,9 +87,9 @@ def build_vocab(filelist=['sumdata/train/train.article.txt', 'sumdata/train/trai
         fin.close()
     print('Number of all words: %d' % len(freq))
     
-    vocab = {'<s>': 0, '</s>': 1, 'UNK': 2, '<pad>': 3}
-    if 'UNK' in freq:
-        freq.pop('UNK')
+    vocab = {start_tok: 0, ed_tok: 1, unk_tok: 2, pad_tok: 3}
+    if unk_tok in freq:
+        freq.pop(unk_tok)
     for word in freq:
         if freq[word] > min_count:
             vocab[word] = len(vocab)
@@ -103,7 +109,7 @@ def load_embedding_vocab(embedding_path):
 
 def build_vocab_from_embeddings(embedding_path, data_file_list):
     embedding_vocab = load_embedding_vocab(embedding_path)
-    vocab = {'<s>': 0, '</s>': 1, '<unk>': 2, '<pad>': 3}
+    vocab = {start_tok: 0, end_tok: 1, unk_tok: 2, pad_tok: 3}
 
     for file in data_file_list:
         fin = open(file)
@@ -112,25 +118,6 @@ def build_vocab_from_embeddings(embedding_path, data_file_list):
                 if (word in embedding_vocab) and (word not in vocab):
                     vocab[word] = len(vocab)
     return vocab
-
-
-def load_data_with_padding(filename, vocab, max_len=100, n_data=None, st='<s>', ed='</s>', unk='<unk>'):
-
-    fin = open(filename, "r", encoding="utf8")
-    datas = []
-    for idx, line in enumerate(fin):
-        if idx == n_data or line == '':
-            break
-
-        sample = np.ones(max_len, dtype=np.int32) * vocab[ed]
-        sample[0] = vocab[st]
-        words = line.strip().split()
-        for i in range(min(len(words), max_len-2)):
-            sample[i+1] = vocab[words[i]] if words[i] in vocab else vocab[unk]
-
-        datas.append(sample)
-
-    return np.array(datas, np.long)
 
 
 def load_data(filename, vocab, n_data=None, target=False):
