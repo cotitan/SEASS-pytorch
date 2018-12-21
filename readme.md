@@ -36,7 +36,7 @@ Training and evaluation for CNN/DM is available https://s3.amazonaws.com/opennmt
 Make sure your project contains the folders above.
 
 ### How-to
-1. Run _python train.py_ to train
+1. Run _python train.py_ to train, it takes about 3.5h per epoch.
 2. Run _python mytest.py_ to generate summaries
 
 ### Performance

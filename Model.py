@@ -73,6 +73,8 @@ class Model(nn.Module):
         self.U = nn.Linear(hid_dim, 2 * hid_dim)
         self.V = nn.Linear(hid_dim, 2 * hid_dim)
 
+        self.dropout = nn.Dropout(p=0.5)
+
         self.decoder2vocab = nn.Linear(self.hid_dim, len(self.vocab))
 
         self.loss_layer = nn.CrossEntropyLoss(ignore_index=self.vocab['<pad>'])
@@ -83,6 +85,7 @@ class Model(nn.Module):
 
     def encode(self, inputs):
         embeds = self.embedding_look_up(inputs)
+        embeds = self.dropout(embeds)
         outputs, hidden = self.encoder(embeds)  # h_0 defaults to zero if not provided
         sn = torch.cat([hidden[0], hidden[1]], dim=-1).view(-1, 1, self.hid_dim)
         # [batch, seq_len, hid_dim] + [batch, 1, hid_dim] = [batch, seq_len, hid_dim]
@@ -97,6 +100,7 @@ class Model(nn.Module):
 
     def decode(self, word, enc_outs, hidden):
         embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
+        embeds = self.dropout(embeds)
         c_t = self.attention_layer(enc_outs, hidden)
         outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
         outputs = self.maxout(embeds, c_t, hidden).squeeze()  # comment this line to remove maxout

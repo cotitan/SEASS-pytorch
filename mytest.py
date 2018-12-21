@@ -100,6 +100,7 @@ def main():
 
 	# model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, max_trg_len=25).cuda()
 	model = Model(vocab, out_len=25, emb_dim=EMB_DIM, hid_dim=HID_DIM).cuda()
+	model.eval()
 
 	file = args.model_file
 	if os.path.exists(file):
