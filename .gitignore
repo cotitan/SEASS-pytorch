@@ -8,5 +8,6 @@
 /sumdata
 /biendata
 /build_vocab_for_biendata.py
+*.bak
 *.pyc
 *~
