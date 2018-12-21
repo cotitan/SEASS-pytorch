@@ -3,7 +3,6 @@ import json
 import utils
 import torch
 import argparse
-from layers import Seq2SeqAttention
 from Model import Model
 from utils import BatchManager, load_data
 import logging
