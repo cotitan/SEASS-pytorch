@@ -129,7 +129,7 @@ def load_data(filename, vocab, n_data=None, target=False):
         words = line.strip().split()
         # if target:
         words = ['<s>'] + words + ['</s>']
-        sample = [vocab[w if w in vocab else unk] for w in words]
+        sample = [vocab[w if w in vocab else unk_tok] for w in words]
         datas.append(sample)
     return datas
 
