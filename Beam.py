@@ -51,7 +51,7 @@ class Beam(object):
         return self.nextYs[-1]
 
     def get_hidden_state(self):
-        return self.hidden
+        return self.hidden.contiguous()
 
     # Get the backpointers for the current timestep.
     def get_prev_word(self):

@@ -47,31 +47,18 @@ if not os.path.exists(model_dir):
 	os.mkdir(model_dir)
 
 
-def calc_loss(logits, batchY, model):
-	# loss = model.loss_function(logits.transpose(1,2), batchY)
-	loss = model.loss_layer(logits.transpose(1, 2), batchY)
-	return loss
-
-
-def validate(valid_x, valid_y, model):
+def run_batch(valid_x, valid_y, model):
 	batch_x = valid_x.next_batch().cuda()
 	batch_y = valid_y.next_batch().cuda()
-	with torch.no_grad():
-		logits = model(batch_x, batch_y)
-		loss = calc_loss(logits, batch_y[:,1:], model) # exclude start token
-		return loss
 
+	outputs, hidden = model.encode(batch_x)
+	hidden = torch.cat([hidden[0], hidden[1]], dim=-1).unsqueeze(0)
 
-def run_step(valid_x, valid_y, model):
-	batch_x = valid_x.next_batch().cuda()
-	batch_y = valid_y.next_batch().cuda()
-	logits = model(batch_x, batch_y)
 	loss = 0
-	for i in range(len(logits)):
-		# loss += calc_loss(logits, batch_y[:,i+1:], model)
-		# logits[i]: batch * V
-		loss += model.loss_layer(logits[i], batch_y[:, i+1]) # i+1 to exclude start token
-	loss /= len(logits)
+	for i in range(batch_y.shape[1]-1):
+		logit, hidden = model.decode(batch_y[:, i], outputs, hidden)
+		loss += model.loss_layer(logit, batch_y[:, i+1]) # i+1 to exclude start token
+	loss /= batch_y.shape[1] # batch_y.shape[1] == out_seq_len
 	return loss
 
 
@@ -82,7 +69,7 @@ def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epoch
 		for idx in range(n_batches):
 			optimizer.zero_grad()
 
-			loss = run_step(train_x, train_y, model)
+			loss = run_batch(train_x, train_y, model)
 			loss.backward()  # do not use retain_graph=True
 			torch.nn.utils.clip_grad_value_(model.parameters(), 5)
 
@@ -92,7 +79,7 @@ def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epoch
 			if (idx + 1) % 50 == 0:
 				train_loss = loss.cpu().detach().numpy()
 				with torch.no_grad():
-					valid_loss = run_step(valid_x, valid_y, model)
+					valid_loss = run_batch(valid_x, valid_y, model)
 				logging.info('epoch %d, step %d, training loss = %f, validation loss = %f'
 							 % (epoch, idx + 1, train_loss, valid_loss))
 			del loss
@@ -113,17 +100,12 @@ def main():
 	BATCH_SIZE = args.batch_size
 	EMB_DIM = args.emb_dim
 	HID_DIM = args.hid_dim
-	MAXOUT_DIM = args.maxout_dim
 
 	data_dir = 'sumdata/'
 	TRAIN_X = 'sumdata/train/train.article.txt'
 	TRAIN_Y = 'sumdata/train/train.title.txt'
 	VALID_X = 'sumdata/train/valid.article.filter.txt'
 	VALID_Y = 'sumdata/train/valid.title.filter.txt'
-	# TRAIN_X = 'sumdata/biendata/train_content.txt'
-	# TRAIN_Y = 'sumdata/biendata/train_title.txt'
-	# VALID_X = 'sumdata/biendata/valid_content.txt'
-	# VALID_Y = 'sumdata/biendata/valid_title.txt'
 
 	vocab_file = os.path.join(data_dir, "vocab.json")
 	if not os.path.exists(vocab_file):

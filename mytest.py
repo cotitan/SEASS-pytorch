@@ -6,6 +6,8 @@ import numpy as np
 from utils import BatchManager, load_data
 from layers import Seq2SeqAttention
 from Model import Model
+from Beam import Beam
+import torch.nn.functional as F
 
 parser = argparse.ArgumentParser(description='Selective Encoding for Abstractive Sentence Summarization in pytorch')
 
@@ -23,29 +25,67 @@ print(args)
 if not os.path.exists(args.model_file):
 	raise FileNotFoundError("model file not found")
 
-start_tok = "<s>"
-end_tok = "</s>"
-unk_tok = "UNK"
-pad_tok = "<pad>"
-
 
 def print_summaries(summaries, vocab):
 	"""
-	param summaries: list of shape (seq_len, batch_tensor)
+	param summaries: in shape (seq_len, batch)
 	"""
 	i2w = {key: value for value, key in vocab.items()}
-	summaries = np.array(summaries).T
 
 	for stnc in summaries:
 		line = [i2w[tok] for tok in stnc if tok != vocab["</s>"]]
 		print(" ".join(line))
 
 
+def greedy(model, batch_x, max_trg_len=10):
+	enc_outs, hidden = model.encode(batch_x)
+	hidden = torch.cat([hidden[0], hidden[1]], dim=-1).unsqueeze(0)
+	
+	words = []
+	word = torch.ones(hidden.shape[1], dtype=torch.long).cuda() * model.vocab["<s>"]
+	for _ in range(max_trg_len):
+		logit, hidden = model.decode(word, enc_outs, hidden)
+		word = torch.argmax(logit, dim=-1)
+		words.append(word.cpu().numpy())
+	return np.array(words).T
+
+
+def beam_search(model, batch_x, max_trg_len=10, k=3):
+	enc_outs, hidden = model.encode(batch_x)
+	hidden = torch.cat([hidden[0], hidden[1]], dim=-1).unsqueeze(0)
+
+	beams = [Beam(k, model.vocab, hidden[:,i,:])
+			for i in range(batch_x.shape[0])]
+	
+	for _ in range(max_trg_len):
+		for j in range(len(beams)):
+			hidden = beams[j].get_hidden_state()
+			word = beams[j].get_current_word()
+			enc_outs_j = enc_outs[j].unsqueeze(0).expand(k, -1, -1)
+			logit, hidden = model.decode(word, enc_outs_j, hidden)
+			# logit: [k x V], hidden: [k x hid_dim]
+			probs = F.softmax(logit, -1)
+			beams[j].advance(probs, hidden)
+
+	allHyp, allScores = [], []
+	n_best = 1
+	for b in range(batch_x.shape[0]):
+		scores, ks = beams[b].sort_best()
+		allScores += [scores[:n_best]]
+		hyps = [beams[b].get_hyp(k) for k in ks[:n_best]]
+		allHyp.append(hyps)
+
+	# shape of allHyp: [batch, 1, list]
+	allHyp = [[int(w.cpu().numpy()) for w in hyp[0]] for hyp in allHyp]
+	return allHyp
+
+
 def my_test(valid_x, model):
 	with torch.no_grad():
 		for _ in range(valid_x.steps):
 			batch_x = valid_x.next_batch().cuda()
-			summaries = model(batch_x, None, test=True)
+			# summaries = greedy(model, batch_x)
+			summaries = beam_search(model, batch_x)
 			print_summaries(summaries, model.vocab)
 
 
