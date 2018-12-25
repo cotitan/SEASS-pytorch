@@ -18,6 +18,7 @@ parser.add_argument('--emb_dim', type=int, default=300, help='Embedding size [de
 parser.add_argument('--hid_dim', type=int, default=512, help='Hidden state size [default: 256]')
 parser.add_argument('--maxout_dim', type=int, default=2, help='Maxout size [default: 2]')
 parser.add_argument('--model_file', type=str, default='./models/params_0.pkl', help='model file path')
+parser.add_argument('--search', type=str, default='greedy', help='greedy/beam')
 args = parser.parse_args()
 print(args)
 
@@ -83,8 +84,12 @@ def my_test(valid_x, model):
 	with torch.no_grad():
 		for _ in range(valid_x.steps):
 			batch_x = valid_x.next_batch().cuda()
-			# summaries = greedy(model, batch_x)
-			summaries = beam_search(model, batch_x)
+			if args.search == "greedy":
+				summaries = greedy(model, batch_x)
+			elif args.search == "beam":
+				summaries = beam_search(model, batch_x)
+			else:
+				print("Unknown search method")
 			print_summaries(summaries, model.vocab)
 
 
