@@ -89,7 +89,7 @@ def my_test(valid_x, model):
 			elif args.search == "beam":
 				summaries = beam_search(model, batch_x)
 			else:
-				print("Unknown search method")
+				raise NameError("Unknown search method")
 			print_summaries(summaries, model.vocab)
 
 
