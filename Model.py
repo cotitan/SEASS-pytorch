@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 from Beam import Beam
 
+torch.manual_seed(1)
 
 class DotAttention(nn.Module):
     """
@@ -66,6 +67,7 @@ class Model(nn.Module):
 
         # self.attention_layer = DotAttention()
         self.attention_layer = BahdanauAttention(self.hid_dim, self.hid_dim)
+        self.enc2dec = nn.Linear(self.hid_dim//2, self.hid_dim)
         self.decoder = nn.GRU(self.emb_dim + self.hid_dim, self.hid_dim, batch_first=True)
 
         # maxout
@@ -78,6 +80,11 @@ class Model(nn.Module):
         self.decoder2vocab = nn.Linear(self.hid_dim, len(self.vocab))
 
         self.loss_layer = nn.CrossEntropyLoss(ignore_index=self.vocab['<pad>'])
+
+    def init_decoder_hidden(self, hidden):
+        hidden = self.enc2dec(hidden[1]).unsqueeze(0)
+        # hidden = torch.cat([hidden[0], hidden[1]], dim=-1).unsqueeze(0)
+        return hidden
 
     def forward(self, inputs, targets):
         outputs, hidden = self.encode(inputs)

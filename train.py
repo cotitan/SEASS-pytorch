@@ -51,7 +51,7 @@ def run_batch(valid_x, valid_y, model):
 	batch_y = valid_y.next_batch().cuda()
 
 	outputs, hidden = model.encode(batch_x)
-	hidden = torch.cat([hidden[0], hidden[1]], dim=-1).unsqueeze(0)
+	hidden = model.init_decoder_hidden(hidden)
 
 	loss = 0
 	for i in range(batch_y.shape[1]-1):
