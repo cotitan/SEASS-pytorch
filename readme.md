@@ -10,10 +10,10 @@
 ### Data
 Training and evaluation data for Gigaword is available https://drive.google.com/open?id=0B6N7tANPyVeBNmlSX19Ld2xDU1E
 
-Training and evaluation for CNN/DM is available https://s3.amazonaws.com/opennmt-models/Summary/cnndm.tar.gz
+Training and evaluation data for CNN/DM is available https://s3.amazonaws.com/opennmt-models/Summary/cnndm.tar.gz
 
 ### Noticement
-1. we use another thread to preprocess a batch of data, which would not end after the main process end. So you need to press ctrl+c again to terminate the thread.
+1. we use another thread to preprocess a batch of data, which would not terminate after the main process terminate. So you need to press ctrl+c again to terminate the thread.
 
 ### Directories:
 ```
