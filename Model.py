@@ -82,7 +82,7 @@ class Model(nn.Module):
         self.loss_layer = nn.CrossEntropyLoss(ignore_index=self.vocab['<pad>'])
 
     def init_decoder_hidden(self, hidden):
-        hidden = self.enc2dec(hidden[1]).unsqueeze(0)
+        hidden = torch.tanh(self.enc2dec(hidden[1]).unsqueeze(0))
         # hidden = torch.cat([hidden[0], hidden[1]], dim=-1).unsqueeze(0)
         return hidden
 

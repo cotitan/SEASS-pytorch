@@ -20,6 +20,7 @@ parser.add_argument('--hid_dim', type=int, default=512, help='Hidden state size 
 parser.add_argument('--maxout_dim', type=int, default=2, help='Maxout size [default: 2]')
 parser.add_argument('--model_file', type=str, default='./models/params_0.pkl', help='model file path')
 parser.add_argument('--search', type=str, default='greedy', help='greedy/beam')
+parser.add_argument('--beam_width', type=int, default=12, help='beam search width')
 args = parser.parse_args()
 print(args)
 
@@ -42,7 +43,6 @@ def print_summaries(summaries, vocab):
 
 def greedy(model, batch_x, max_trg_len=10):
 	enc_outs, hidden = model.encode(batch_x)
-	# hidden = torch.cat([hidden[0], hidden[1]], dim=-1).unsqueeze(0)
 	hidden = model.init_decoder_hidden(hidden)
 	
 	words = []
@@ -54,9 +54,9 @@ def greedy(model, batch_x, max_trg_len=10):
 	return np.array(words).T
 
 
-def beam_search(model, batch_x, max_trg_len=10, k=3):
+def beam_search(model, batch_x, max_trg_len=10, k=args.beam_width):
 	enc_outs, hidden = model.encode(batch_x)
-	hidden = torch.cat([hidden[0], hidden[1]], dim=-1).unsqueeze(0)
+	hidden = model.init_decoder_hidden(hidden)
 
 	beams = [Beam(k, model.vocab, hidden[:,i,:])
 			for i in range(batch_x.shape[0])]
