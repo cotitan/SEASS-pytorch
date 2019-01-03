@@ -75,7 +75,7 @@ class Beam(object):
         self.hidden = hidden
         """Advance the beam."""
         workd_lk = workd_lk.squeeze()
-        num_words = workd_lk.size(1)
+        num_words = workd_lk.shape[-1]
 
         # Sum the previous scores.
         if len(self.prevKs) > 0:
@@ -99,6 +99,40 @@ class Beam(object):
             self.done = True
 
         return self.done
+
+    def advance_(self, log_probs, hidden):
+        if self.done:
+            return True
+
+        self.hidden = hidden
+        """Advance the beam."""
+        log_probs = log_probs.squeeze() # k*V
+        num_words = log_probs.shape[-1]
+
+        # Sum the previous scores.
+        if len(self.prevKs) > 0:
+            beam_lk = log_probs + self.scores.unsqueeze(1).expand_as(log_probs)
+        else:
+            beam_lk = log_probs[0]
+
+        flat_beam_lk = beam_lk.view(-1)
+
+        bestScores, bestScoresId = flat_beam_lk.topk(self.size, 0, True, True)
+        self.scores = bestScores
+
+        # bestScoresId is flattened beam x word array, so calculate which
+        # word and beam each score came from
+        prev_k = bestScoresId / num_words
+        self.prevKs.append(prev_k)
+        self.nextYs.append(bestScoresId - prev_k * num_words)
+        
+        self.hidden = hidden[:,prev_k,:] # hidden: 1 * k * hid_dim
+        # for i in range(self.size):
+        #     self.hidden[i] = hidden[prev_k[i]]
+
+        # End condition is when top-of-beam is EOS.
+        if self.nextYs[-1][0] == self.eos:
+            self.done = True
 
     def sort_best(self):
         """Sort the beam."""
