@@ -39,3 +39,5 @@ Make sure your project contains the folders above.
 1. Run _python train.py_ to train, it takes about 3.5h per epoch.
 2. Run _python mytest.py_ to generate summaries
 
+### TODO
+1. learning rate decay, which is essential
