@@ -81,7 +81,6 @@ def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epoch
 					valid_loss = run_batch(valid_x, valid_y, model)
 				logging.info('epoch %d, step %d, training loss = %f, validation loss = %f'
 							 % (epoch, idx + 1, train_loss, valid_loss))
-			del loss
 
 		model.cpu()
 		torch.save(model.state_dict(), os.path.join(model_dir, 'params_%d.pkl' % epoch))
