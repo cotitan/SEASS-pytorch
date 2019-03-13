@@ -5,28 +5,37 @@ from Beam import Beam
 
 torch.manual_seed(1)
 
-class DotAttention(nn.Module):
-    """
-    Dot attention calculation
-    """
-    def __init__(self):
-        super(DotAttention, self).__init__()
-        self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, enc_outs, s_prev, mask=None):
+class LuongAttention(nn.Module):
+    def __init__(self, enc_dim, dec_dim, align='concat'):
+        super(LuongAttention, self).__init__()
+        assert align in ['dot', 'general', 'concat']
+        self.align = align
+        if align == 'concat':
+            self.W = nn.Linear(enc_dim + dec_dim, dec_dim)
+            self.V = nn.Linear(dec_dim, 1)
+        elif align == 'general':
+            self.W = nn.Linear(enc_dim, dec_dim)
+        self.softmax = nn.Softmax(dim=-1)
+    
+    def forward(self, enc_outs, ht, mask=None):
         """
-        calculate the context vector c_t, both the input and output are batch first
-        :param enc_outs: the encoder states, in shape [batch, seq_len, dim]
-        :param s_prev: the previous states of decoder, h_{t-1}, in shape [1, batch, dim]
-        :param mask: mask for pad value
-        :return: c_t: context vector
+        :param enc_outs: shape = [batch, seqlen, enc_dim]
+        :param ht: shape = [1, batch, dec_dim]
         """
-        alpha_t = torch.bmm(s_prev.transpose(0, 1), enc_outs.transpose(1, 2))  # [batch, 1, seq_len]
+        if self.align == 'dot':
+            scores = torch.bmm(ht.transpose(0,1), enc_outs.transpose(1,2))
+        elif self.align == 'general':
+            scores = torch.bmm(ht.transpose(0,1), enc_outs.transpose(1,2))
+        else:
+            ht_expand = ht.transpose(0,1).expand_as(enc_outs)
+            cat = torch.cat([enc_outs, ht_expand], dim=-1)
+            scores = self.V(torch.tanh(self.W(cat))).transpose(1, 2) # batch, 1, seqlen
         if mask is not None:
-            alpha_t = alpha_t.masked_fill(mask, -1e9)
-        e_t = self.softmax(alpha_t)
-        # print(mask, e_t)
-        c_t = torch.bmm(e_t, enc_outs)  # [batch, 1, dim]
+            scores.masked_fill(mask, -1e9)
+        weights = self.softmax(scores)
+        # batch,1,seqlen * batch,seqlen,enc_dim = batch, 1, enc_dim
+        c_t = torch.bmm(weights, enc_outs)
         return c_t
 
 
@@ -55,8 +64,9 @@ class BahdanauAttention(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, vocab, out_len=15, emb_dim=32, hid_dim=128, embeddings=None):
+    def __init__(self, vocab, out_len=15, emb_dim=32, hid_dim=128, embeddings=None, attn='bahdanau'):
         super(Model, self).__init__()
+        assert attn in ['luong', 'bahdanau']
         self.out_len = out_len
         self.hid_dim = hid_dim
         self.emb_dim = emb_dim
@@ -66,20 +76,28 @@ class Model(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
 
         if embeddings is None:
-            self.embedding_look_up = nn.Embedding(self.n_vocab, self.emb_dim, padding_idx=0)
+            self.embedding_look_up = nn.Embedding(self.n_vocab, emb_dim, padding_idx=vocab['<pad>'])
         else:
             self.embedding_look_up = nn.Embedding.from_pretrained(embeddings, freeze=False)
 
         # encoder (with selective gate)
-        self.encoder = nn.GRU(self.emb_dim, self.hid_dim//2, batch_first=True, bidirectional=True)
+        self.encoder = nn.GRU(emb_dim, hid_dim//2, batch_first=True, bidirectional=True)
         self.linear1 = nn.Linear(hid_dim, hid_dim)
         self.linear2 = nn.Linear(hid_dim, hid_dim)
         self.sigmoid = nn.Sigmoid()
 
-        self.attention_layer = DotAttention()
-        # self.attention_layer = BahdanauAttention(self.hid_dim, self.hid_dim)
-        self.enc2dec = nn.Linear(self.hid_dim//2, self.hid_dim)
-        self.decoder = nn.GRU(self.emb_dim + self.hid_dim, self.hid_dim, batch_first=True)
+        self.attn = attn
+        if attn == 'luong:'
+            # self.attn_layer = LuongAttention(hid_dim, hid_dim, align='dot')
+            self.attn_layer = LuongAttention(hid_dim, hid_dim, align='concat')
+            self.decoder = nn.GRU(emb_dim, hid_dim, batch_first=True)
+            self.decoder2vocab = nn.Linear(hid_dim * 2, self.n_vocab)
+        else:
+            self.attn_layer = BahdanauAttention(hid_dim, hid_dim)
+            self.decoder = nn.GRU(emb_dim + hid_dim, hid_dim, batch_first=True)
+            self.decoder2vocab = nn.Linear(hid_dim, self.n_vocab)
+
+        self.enc2dec = nn.Linear(hid_dim//2, hid_dim)
 
         # maxout
         self.W = nn.Linear(emb_dim, 2 * hid_dim)
@@ -88,13 +106,10 @@ class Model(nn.Module):
 
         self.dropout = nn.Dropout(p=0.5)
 
-        self.decoder2vocab = nn.Linear(self.hid_dim, self.n_vocab)
-
-        self.loss_layer = nn.CrossEntropyLoss(ignore_index=self.vocab['<pad>'])
+        self.loss_layer = nn.CrossEntropyLoss(ignore_index=vocab['<pad>'])
 
     def init_decoder_hidden(self, hidden):
         hidden = torch.tanh(self.enc2dec(hidden[1]).unsqueeze(0))
-        # hidden = torch.cat([hidden[0], hidden[1]], dim=-1).unsqueeze(0)
         return hidden
 
     def forward(self, inputs, targets):
@@ -119,8 +134,12 @@ class Model(nn.Module):
     def decode(self, word, enc_outs, hidden, mask=None):
         embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)
         embeds = self.dropout(embeds)
-        c_t = self.attention_layer(enc_outs, hidden, mask)
-        outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
+        if self.attn == 'luong':
+            outputs, hidden = self.decoder(embeds, hidden)
+            c_t = self.attn_layer(enc_outs, hidden, mask)
+        else:
+            c_t = self.attn_layer(enc_outs, hidden, mask)
+            outputs, hidden = self.decoder(torch.cat([c_t, embeds], dim=-1), hidden)
         outputs = self.maxout(embeds, c_t, hidden).squeeze()  # comment this line to remove maxout
         logit = self.decoder2vocab(outputs).squeeze()
         return logit, hidden

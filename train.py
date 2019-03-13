@@ -18,6 +18,7 @@ parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
 parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
 parser.add_argument('--ckpt_file', type=str, default='./ckpts/params_0.pkl')
+parser.add_argument('--data_dir', type=str, default='/home/kaiying/coco/datas/sumdata/')
 args = parser.parse_args()
 
 
@@ -110,7 +111,7 @@ def main():
 	N_VALID = args.n_valid
 	BATCH_SIZE = args.batch_size
 
-	data_dir = '/home/kaiying/coco/datas/sumdata/'
+	data_dir = args.data_dir
 	TRAIN_X = os.path.join(data_dir, 'train/train.article.txt')
 	TRAIN_Y = os.path.join(data_dir, 'train/train.title.txt')
 	VALID_X = os.path.join(data_dir, 'train/valid.article.filter.txt')
