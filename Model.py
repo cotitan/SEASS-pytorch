@@ -87,7 +87,7 @@ class Model(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
         self.attn = attn
-        if attn == 'luong:'
+        if attn == 'luong':
             # self.attn_layer = LuongAttention(hid_dim, hid_dim, align='dot')
             self.attn_layer = LuongAttention(hid_dim, hid_dim, align='concat')
             self.decoder = nn.GRU(emb_dim, hid_dim, batch_first=True)
