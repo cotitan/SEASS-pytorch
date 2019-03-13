@@ -1,6 +1,7 @@
 import json
 import numpy as np
 from collections import defaultdict
+import word2vec
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 import torch
@@ -37,7 +38,7 @@ class BatchManager:
 
     def next_batch(self):
         batch = list(self.datas[self.bid * self.batch_size: (self.bid + 1) * self.batch_size])
-        batch = my_pad_sequence(batch, 3)
+        batch = my_pad_sequence(batch, 0) # pad_index
         self.bid += 1
         if self.bid == self.steps:
             self.bid = 0
@@ -76,6 +77,23 @@ def load_embedding_vocab(embedding_path):
     for _, line in enumerate(fin):
         vocab.add(line.split()[0])
     return vocab
+
+
+def load_word2vec_embedding(filepath):
+    w2v = word2vec.load(filepath)
+    weights = w2v.vectors
+    vocab = {}
+
+    if start_tok not in w2v.vocab:
+        w2v.vocab = np.concatenate([np.array([start_tok]), w2v.vocab])
+        weights = np.concatenate([np.zeros((1, weights.shape[1])), weights], axis=0)
+
+    if pad_tok not in w2v.vocab:
+        vocab[pad_tok] = 0
+        weights = np.concatenate([np.zeros((1, weights.shape[1])), weights], axis=0)
+    for tok in w2v.vocab:
+        vocab[tok] = len(vocab)
+    return vocab, torch.tensor(weights, dtype=torch.float)
 
 
 def build_vocab_from_embeddings(embedding_path, data_file_list):

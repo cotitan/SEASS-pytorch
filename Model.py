@@ -25,6 +25,7 @@ class DotAttention(nn.Module):
         if mask is not None:
             alpha_t = alpha_t.masked_fill(mask, -1e9)
         e_t = self.softmax(alpha_t)
+        # print(mask, e_t)
         c_t = torch.bmm(e_t, enc_outs)  # [batch, 1, dim]
         return c_t
 
@@ -67,7 +68,7 @@ class Model(nn.Module):
         if embeddings is None:
             self.embedding_look_up = nn.Embedding(self.n_vocab, self.emb_dim, padding_idx=0)
         else:
-            self.embedding_look_up = nn.Embedding.from_pretrained(embeddings, freeze=True)
+            self.embedding_look_up = nn.Embedding.from_pretrained(embeddings, freeze=False)
 
         # encoder (with selective gate)
         self.encoder = nn.GRU(self.emb_dim, self.hid_dim//2, batch_first=True, bidirectional=True)
@@ -113,7 +114,7 @@ class Model(nn.Module):
     def maxout(self, w, c_t, hidden):
         r_t = self.W(w) + self.U(c_t) + self.V(hidden.transpose(0,1))
         m_t = F.max_pool1d(r_t, kernel_size=2, stride=2)
-        return m_t
+        return self.dropout(m_t)
 
     def decode(self, word, enc_outs, hidden, mask=None):
         embeds = self.embedding_look_up(word).view(-1, 1, self.emb_dim)

@@ -17,7 +17,7 @@ parser.add_argument('--n_train', type=int, default=3803900,
 parser.add_argument('--n_valid', type=int, default=189651,
 					help='Number of validation data (up to 189651 in gigaword) [default: 189651])')
 parser.add_argument('--batch_size', type=int, default=64, help='Mini batch size [default: 32]')
-parser.add_argument('--model_file', type=str, default='./models/params_0.pkl')
+parser.add_argument('--ckpt_file', type=str, default='./ckpts/params_0.pkl')
 args = parser.parse_args()
 
 
@@ -40,7 +40,7 @@ console.setFormatter(formatter)
 logging.getLogger('').addHandler(console)
 
 
-model_dir = './models'
+model_dir = './ckpts'
 if not os.path.exists(model_dir):
 	os.mkdir(model_dir)
 
@@ -63,7 +63,7 @@ def run_batch(valid_x, valid_y, model):
 	for i in range(batch_y.shape[1] - 1):
 		logit, hidden = model.decode(batch_y[:, i], outputs, hidden, mask)
 		loss += model.loss_layer(logit, batch_y[:, i+1])
-	loss /= batch_y.shape[0]
+	loss /= batch_y.shape[1]
 	return loss
 
 
@@ -93,9 +93,10 @@ def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epoch
 				model.train()
 				writer.add_scalar('train_loss', train_loss, (idx + 1) / 50)
 				writer.add_scalar('valid_loss', valid_loss, (idx + 1) / 50)
-		scheduler.step()
+		if epoch < 6:
+			scheduler.step()
 		writer.close()
-		saved_state = {'epoch': epoch, 'lr': optimizer.param_groups[0]['lr'],
+		saved_state = {'epoch': epoch + 1, 'lr': optimizer.param_groups[0]['lr'],
 					   'state_dict': model.state_dict()}
 		torch.save(saved_state, os.path.join(model_dir, 'params_%d.pkl' % epoch))
 		logging.info('Model saved in dir %s' % model_dir)
@@ -109,16 +110,22 @@ def main():
 	N_VALID = args.n_valid
 	BATCH_SIZE = args.batch_size
 
-	data_dir = '/home/kirk/Desktop/datas/sumdata/'
+	data_dir = '/home/kaiying/coco/datas/sumdata/'
 	TRAIN_X = os.path.join(data_dir, 'train/train.article.txt')
 	TRAIN_Y = os.path.join(data_dir, 'train/train.title.txt')
 	VALID_X = os.path.join(data_dir, 'train/valid.article.filter.txt')
 	VALID_Y = os.path.join(data_dir, 'train/valid.title.filter.txt')
 
+	"""
 	vocab_file = os.path.join(data_dir, "vocab.json")
 	if not os.path.exists(vocab_file):
 		utils.build_vocab([TRAIN_X, TRAIN_Y], vocab_file, n_vocab=80000)
 	vocab = json.load(open(vocab_file))
+	"""
+		
+	embedding_path = '/home/kaiying/coco/embeddings/giga-256d.bin'
+	vocab, embeddings = utils.load_word2vec_embedding(embedding_path)
+	print(len(vocab), embeddings.shape)
 
 	train_x = BatchManager(load_data(TRAIN_X, vocab, N_TRAIN), BATCH_SIZE)
 	train_y = BatchManager(load_data(TRAIN_Y, vocab, N_TRAIN), BATCH_SIZE)
@@ -127,18 +134,19 @@ def main():
 	valid_y = BatchManager(load_data(VALID_Y, vocab, N_VALID), BATCH_SIZE)
 
 	# model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, max_trg_len=25).cuda()
-	model = Model(vocab, out_len=15, emb_dim=100, hid_dim=256).cuda()
+	model = Model(vocab, out_len=15, emb_dim=256, hid_dim=512, embeddings=embeddings).cuda()
 	# model.embedding_look_up.to(torch.device("cpu"))
 
-	model_file = args.model_file
+	ckpt_file = args.ckpt_file
 	saved_state = {'lr': 0.001, 'epoch': 0}
-	if os.path.exists(model_file):
-		saved_state = torch.load(model_file)
+	if os.path.exists(ckpt_file):
+		saved_state = torch.load(ckpt_file)
 		model.load_state_dict(saved_state['state_dict'])
-		logging.info('Load model parameters from %s' % model_file)
+		logging.info('Load model parameters from %s' % ckpt_file)
 
 	optimizer = torch.optim.Adam(model.parameters(), lr=saved_state['lr'])
 	scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
+	scheduler.step()
 
 	train(train_x, train_y, valid_x, valid_y, model, optimizer,
 		  scheduler, saved_state['epoch'], N_EPOCHS)
