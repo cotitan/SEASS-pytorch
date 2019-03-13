@@ -72,6 +72,9 @@ def train(train_x, train_y, valid_x, valid_y, model, optimizer, scheduler, epoch
 	logging.info("Start to train...")
 	n_batches = train_x.steps
 	for epoch in range(epoch, epochs):
+		valid_x.bid = 0
+		valid_y.bid = 0
+		
 		if os.path.exists('runs/epoch%d' % epoch):
 			shutil.rmtree('runs/epoch%d' % epoch)
 		writer = SummaryWriter('runs/epoch%d' % epoch)
