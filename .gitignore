@@ -1,6 +1,5 @@
 /data/*
 /runs/*
-/models/*
 /ckpts/*
 /.idea/*
 /.vscode/*

@@ -31,7 +31,7 @@ Training and evaluation data for CNN/DM is available https://s3.amazonaws.com/op
 |   └── vocab.json # will be built automatically if not exists
 ├── readme.md
 ├── log/
-└── models/
+└── ckpts/
 ```
 Make sure your project contains the folders above.
 
