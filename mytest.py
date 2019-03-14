@@ -57,7 +57,7 @@ def beam_search(model, batch_x, max_trg_len=15, k=args.beam_width):
 	hidden = model.init_decoder_hidden(hidden)
 	mask = batch_x.eq(model.vocab['<pad>'])
 
-	beams = [Beam(k, model.vocab, hidden[:,i,:], mask[i])
+	beams = [Beam(k, model.vocab, hidden[:,i,:])
 			for i in range(batch_x.shape[0])]
 	
 	for _ in range(max_trg_len):
@@ -88,7 +88,8 @@ def beam_search(model, batch_x, max_trg_len=15, k=args.beam_width):
 def my_test(test_x, model):
 	summaries = []
 	with torch.no_grad():
-		for _ in range(test_x.steps):
+		for i in range(test_x.steps):
+			print(i, end=' ', flush=True)
 			batch_x = test_x.next_batch().cuda()
 			if args.search == "greedy":
 				summary = greedy(model, batch_x)
