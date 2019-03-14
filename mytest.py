@@ -61,16 +61,29 @@ def beam_search(model, batch_x, max_trg_len=15, k=args.beam_width):
 	beams = [Beam(k, model.vocab, hidden[:,i,:]) for i in range(b_size)]
 	
 	for _ in range(max_trg_len):
-		for j in range(b_size):
-			word = beams[j].get_current_word()
-			enc_outs_j = enc_outs[j].unsqueeze(0).expand(k, -1, -1)
-			hidden = beams[j].get_hidden_state()
-			mask_j = mask[j].unsqueeze(0).expand(k, -1, -1)
+		not_finish = [j for j in range(b_size) if not beams[j].done]
+		_word_ = torch.stack([beams[j].get_current_word() for j in not_finish], dim=0)
+		_enc_outs_ = torch.stack([enc_outs[j].unsqueeze(0).expand(k, -1, -1) for j in not_finish], dim=0)
+		_hidden_ = torch.stack([beams[j].get_hidden_state() for j in not_finish], dim=1)
+		_mask_ = torch.stach([mask[j].unsqueeze(0).expand(k, -1, -1) for j in not_finish], dim=0)
 
-			logit, hidden = model.decode(word, enc_outs_j, hidden, mask_j)
-			# logit: [k x V], hidden: [k x hid_dim]
-			log_probs = torch.log(F.softmax(logit, -1))
-			beams[j].advance_(log_probs, hidden)
+		logits, hidden = model.decode(_word_, _enc_outs_, _hidden_, _mask_)
+		log_probs = torch.log(F.softmax(logits, -1))
+		idx = 0
+		for j in not_finish:
+			beams[j].advance_(log_probs[idx: idx+k], hidden[:, idx: idx+k, :])
+			idx += k
+
+		# for j in range(b_size):
+		# 	word = beams[j].get_current_word()
+		# 	enc_outs_j = enc_outs[j].unsqueeze(0).expand(k, -1, -1)
+		# 	hidden = beams[j].get_hidden_state()
+		# 	mask_j = mask[j].unsqueeze(0).expand(k, -1, -1)
+
+		# 	logit, hidden = model.decode(word, enc_outs_j, hidden, mask_j)
+		# 	# logit: [k x V], hidden: [k x hid_dim]
+		# 	log_probs = torch.log(F.softmax(logit, -1))
+		# 	beams[j].advance_(log_probs, hidden)
 
 	allHyp, allScores = [], []
 	n_best = 1
