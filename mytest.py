@@ -66,7 +66,7 @@ def beam_search(model, batch_x, max_trg_len=15, k=args.beam_width):
 			enc_outs_j = enc_outs[j].unsqueeze(0).expand(k, -1, -1)
 			logit, hidden = model.decode(word, enc_outs_j, hidden)
 			# logit: [k x V], hidden: [k x hid_dim]
-			log_probs = F.softmax(logit, -1)
+			log_probs = torch.log(F.softmax(logit, -1))
 			beams[j].advance_(log_probs, hidden)
 
 	allHyp, allScores = [], []
