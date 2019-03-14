@@ -65,7 +65,7 @@ def beam_search(model, batch_x, max_trg_len=15, k=args.beam_width):
 			word = beams[j].get_current_word()
 			enc_outs_j = enc_outs[j].unsqueeze(0).expand(k, -1, -1)
 			hidden = beams[j].get_hidden_state()
-			mask_j = mask[j].unsqueeze(0).expand(k, -1)
+			mask_j = mask[j].unsqueeze(0).expand(k, -1, -1)
 
 			logit, hidden = model.decode(word, enc_outs_j, hidden, mask_j)
 			# logit: [k x V], hidden: [k x hid_dim]
