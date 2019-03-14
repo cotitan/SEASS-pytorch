@@ -62,10 +62,10 @@ def beam_search(model, batch_x, max_trg_len=15, k=args.beam_width):
 	
 	for _ in range(max_trg_len):
 		not_finish = [j for j in range(b_size) if not beams[j].done]
-		_word_ = torch.concat([beams[j].get_current_word() for j in not_finish], dim=0)
-		_enc_outs_ = torch.concat([enc_outs[j].unsqueeze(0).expand(k, -1, -1) for j in not_finish], dim=0)
-		_hidden_ = torch.concat([beams[j].get_hidden_state() for j in not_finish], dim=1)
-		_mask_ = torch.concat([mask[j].unsqueeze(0).expand(k, -1, -1) for j in not_finish], dim=0)
+		_word_ = torch.cat([beams[j].get_current_word() for j in not_finish], dim=0)
+		_enc_outs_ = torch.cat([enc_outs[j].unsqueeze(0).expand(k, -1, -1) for j in not_finish], dim=0)
+		_hidden_ = torch.cat([beams[j].get_hidden_state() for j in not_finish], dim=1)
+		_mask_ = torch.cat([mask[j].unsqueeze(0).expand(k, -1, -1) for j in not_finish], dim=0)
 
 		logits, hidden = model.decode(_word_, _enc_outs_, _hidden_, _mask_)
 		log_probs = torch.log(F.softmax(logits, -1))
