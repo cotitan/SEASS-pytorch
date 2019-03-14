@@ -62,6 +62,8 @@ def beam_search(model, batch_x, max_trg_len=15, k=args.beam_width):
 	
 	for _ in range(max_trg_len):
 		not_finish = [j for j in range(b_size) if not beams[j].done]
+		if len(not_finish) == 0:
+			break
 		_word_ = torch.cat([beams[j].get_current_word() for j in not_finish], dim=0)
 		_enc_outs_ = torch.cat([enc_outs[j].unsqueeze(0).expand(k, -1, -1) for j in not_finish], dim=0)
 		_hidden_ = torch.cat([beams[j].get_hidden_state() for j in not_finish], dim=1)
