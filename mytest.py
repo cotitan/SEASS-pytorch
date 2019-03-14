@@ -55,13 +55,13 @@ def greedy(model, batch_x, max_trg_len=15):
 def beam_search(model, batch_x, max_trg_len=15, k=args.beam_width):
 	enc_outs, hidden = model.encode(batch_x)
 	hidden = model.init_decoder_hidden(hidden)
-	mask = batch_x.eq(model.vocab['<pad>'])
+	mask = batch_x.eq(model.vocab['<pad>']).unsqueeze(1)
+	b_size = batch_x.shape[0]
 
-	beams = [Beam(k, model.vocab, hidden[:,i,:])
-			for i in range(batch_x.shape[0])]
+	beams = [Beam(k, model.vocab, hidden[:,i,:]) for i in range(b_size)]
 	
 	for _ in range(max_trg_len):
-		for j in range(len(beams)):
+		for j in range(b_size):
 			word = beams[j].get_current_word()
 			enc_outs_j = enc_outs[j].unsqueeze(0).expand(k, -1, -1)
 			hidden = beams[j].get_hidden_state()
