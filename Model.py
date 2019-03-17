@@ -64,10 +64,9 @@ class BahdanauAttention(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, vocab, out_len=15, emb_dim=32, hid_dim=128, embeddings=None, attn='bahdanau'):
+    def __init__(self, vocab, emb_dim=32, hid_dim=128, embeddings=None, attn='bahdanau'):
         super(Model, self).__init__()
         assert attn in ['luong', 'bahdanau']
-        self.out_len = out_len
         self.hid_dim = hid_dim
         self.emb_dim = emb_dim
         self.vocab = vocab

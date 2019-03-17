@@ -137,8 +137,7 @@ def main():
 	valid_x = BatchManager(load_data(VALID_X, vocab, N_VALID), BATCH_SIZE)
 	valid_y = BatchManager(load_data(VALID_Y, vocab, N_VALID), BATCH_SIZE)
 
-	# model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, max_trg_len=25).cuda()
-	model = Model(vocab, out_len=15, emb_dim=256, hid_dim=512, embeddings=embeddings).cuda()
+	model = Model(vocab, emb_dim=256, hid_dim=512, embeddings=embeddings).cuda()
 	# model.embedding_look_up.to(torch.device("cpu"))
 
 	ckpt_file = args.ckpt_file

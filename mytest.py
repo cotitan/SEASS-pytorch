@@ -30,6 +30,7 @@ def print_summaries(summaries, vocab):
 	param summaries: in shape (seq_len, batch)
 	"""
 	i2w = {key: value for value, key in vocab.items()}
+	i2w[vocab['<unk>']] = 'UNK'
 
 	for idx in range(len(summaries)):
 		fout = open(os.path.join(args.output_dir, "%d.txt" % idx), "w")
@@ -129,7 +130,7 @@ def main():
 
 	test_x = BatchManager(load_data(args.input_file, vocab, N_TEST), BATCH_SIZE)
 	# model = Seq2SeqAttention(len(vocab), EMB_DIM, HID_DIM, BATCH_SIZE, vocab, max_trg_len=25).cuda()
-	model = Model(vocab, out_len=15, emb_dim=256, hid_dim=512, embeddings=embeddings).cuda()
+	model = Model(vocab, emb_dim=256, hid_dim=512, embeddings=embeddings).cuda()
 	model.eval()
 
 	file = args.ckpt_file
